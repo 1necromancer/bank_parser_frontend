@@ -227,6 +227,7 @@ export default function TransactionsPage() {
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted uppercase">
               <th className="px-4 py-3">Дата</th>
+              <th className="px-4 py-3">Банк</th>
               <th className="px-4 py-3">Получатель</th>
               <th className="px-4 py-3">Описание</th>
               <th className="px-4 py-3">Категория</th>
@@ -238,6 +239,7 @@ export default function TransactionsPage() {
             {transactions.map((tx) => (
               <tr key={tx.id} className="group hover:bg-gray-50/50 transition-colors">
                 <td className="whitespace-nowrap px-4 py-3 text-muted">{tx.date}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">{tx.bank_name || "—"}</td>
                 <td className="px-4 py-3 font-medium max-w-48 truncate">{tx.merchant || "—"}</td>
                 <td className="px-4 py-3 text-muted max-w-64 truncate">{tx.description || "—"}</td>
                 <td className="px-4 py-3">
@@ -268,7 +270,7 @@ export default function TransactionsPage() {
             ))}
             {transactions.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-muted">
+                <td colSpan={7} className="py-12 text-center text-muted">
                   Нет транзакций
                 </td>
               </tr>

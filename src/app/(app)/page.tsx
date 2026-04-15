@@ -45,22 +45,26 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const [s, c, cf, r] = await Promise.all([
-        api.getSummary(),
-        api.getCategoryBreakdown(),
-        api.getCashflow("monthly"),
-        api.getRecurring(),
-      ]);
-      setSummary(s);
-      setCategories(c);
-      setCashflow(cf.points);
-      setRecurring(r);
-    } catch {
-      /* silent — empty dashboard */
-    } finally {
-      setLoading(false);
-    }
+    const results = await Promise.allSettled([
+      api.getSummary(),
+      api.getCategoryBreakdown(),
+      api.getCashflow("monthly"),
+      api.getRecurring(),
+    ]);
+
+    if (results[0].status === "fulfilled") setSummary(results[0].value);
+    else console.error("dashboard/summary:", results[0].reason);
+
+    if (results[1].status === "fulfilled") setCategories(results[1].value);
+    else console.error("dashboard/categories:", results[1].reason);
+
+    if (results[2].status === "fulfilled") setCashflow(results[2].value.points);
+    else console.error("dashboard/cashflow:", results[2].reason);
+
+    if (results[3].status === "fulfilled") setRecurring(results[3].value);
+    else console.error("dashboard/recurring:", results[3].reason);
+
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);

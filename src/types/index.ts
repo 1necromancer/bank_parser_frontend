@@ -20,6 +20,7 @@ export interface Transaction {
   account_id: number;
   category_id?: number;
   category_name?: string;
+  bank_name?: string;
   date: string;
   amount: number;
   description?: string;
