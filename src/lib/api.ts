@@ -17,9 +17,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8123";
 
 class ApiClient {
   private token: string | null = null;
+  private onUnauthorized: (() => void) | null = null;
 
   setToken(token: string | null) {
     this.token = token;
+  }
+
+  setOnUnauthorized(cb: () => void) {
+    this.onUnauthorized = cb;
   }
 
   private async request<T>(
@@ -45,6 +50,11 @@ class ApiClient {
     });
 
     if (response.status === 204) return undefined as T;
+
+    if (response.status === 401) {
+      this.onUnauthorized?.();
+      throw new Error("Сессия истекла");
+    }
 
     if (!response.ok) {
       const error = await response

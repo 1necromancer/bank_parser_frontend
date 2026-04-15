@@ -31,6 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
+  const handleUnauthorized = useCallback(() => {
+    setToken(null);
+    setEmail(null);
+    setName(null);
+    api.setToken(null);
+    localStorage.removeItem("auth");
+    router.push("/auth/login");
+  }, [router]);
+
+  useEffect(() => {
+    api.setOnUnauthorized(handleUnauthorized);
+  }, [handleUnauthorized]);
+
   useEffect(() => {
     const saved = localStorage.getItem("auth");
     if (saved) {
