@@ -177,9 +177,33 @@ class ApiClient {
     });
   }
 
+  deleteTransaction(id: number) {
+    return this.request<void>(`/transactions/${id}`, { method: "DELETE" });
+  }
+
+  deleteTransactionsByRange(accountId: number, dateFrom: string, dateTo: string) {
+    const p = new URLSearchParams({
+      account_id: String(accountId),
+      date_from: dateFrom,
+      date_to: dateTo,
+    });
+    return this.request<{ deleted: number }>(`/transactions?${p}`, {
+      method: "DELETE",
+    });
+  }
+
+  // ---- Categories ----  (delete)
+  deleteCategory(id: number) {
+    return this.request<void>(`/categories/${id}`, { method: "DELETE" });
+  }
+
   // ---- Accounts ----
   getAccounts() {
     return this.request<Account[]>("/accounts");
+  }
+
+  deleteAccount(id: number) {
+    return this.request<void>(`/accounts/${id}`, { method: "DELETE" });
   }
 }
 

@@ -98,7 +98,7 @@ export default function ImportPage() {
             <InfoBlock icon={<FileText className="h-5 w-5" />} label="Файл" value={result.filename} />
             <InfoBlock label="Банк" value={result.bank} />
             <InfoBlock label="Создано" value={`${result.created} транзакций`} variant="income" />
-            <InfoBlock label="Дубликаты" value={`${result.duplicates_skipped} пропущено`} variant={result.duplicates_skipped > 0 ? "warn" : "default"} />
+            <InfoBlock label="Заменено" value={`${result.replaced} старых`} variant={result.replaced > 0 ? "warn" : "default"} />
           </div>
 
           {result.date_from && result.date_to && (

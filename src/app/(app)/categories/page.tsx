@@ -60,6 +60,16 @@ export default function CategoriesPage() {
     } catch { /* ignore */ }
   }
 
+  async function handleDeleteCategory(id: number) {
+    if (!confirm("Удалить категорию? Транзакции останутся без категории.")) return;
+    try {
+      await api.deleteCategory(id);
+      load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка удаления");
+    }
+  }
+
   async function handleDeleteRule(id: number) {
     try {
       await api.deleteRule(id);
@@ -88,7 +98,7 @@ export default function CategoriesPage() {
 
           <div className="mb-5 space-y-1">
             {tree.map((node) => (
-              <TreeNode key={node.id} node={node} depth={0} />
+              <TreeNode key={node.id} node={node} depth={0} onDelete={handleDeleteCategory} />
             ))}
             {tree.length === 0 && (
               <p className="py-4 text-center text-sm text-muted">Нет категорий</p>
@@ -209,12 +219,12 @@ export default function CategoriesPage() {
   );
 }
 
-function TreeNode({ node, depth }: { node: CategoryTree; depth: number }) {
+function TreeNode({ node, depth, onDelete }: { node: CategoryTree; depth: number; onDelete: (id: number) => void }) {
   const hasChildren = node.children && node.children.length > 0;
   return (
     <>
       <div
-        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors"
+        className="group flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors"
         style={{ paddingLeft: `${12 + depth * 20}px` }}
       >
         {hasChildren ? (
@@ -222,11 +232,18 @@ function TreeNode({ node, depth }: { node: CategoryTree; depth: number }) {
         ) : (
           <span className="w-3.5" />
         )}
-        <span className={depth === 0 ? "font-medium" : "text-muted"}>{node.name}</span>
+        <span className={`flex-1 ${depth === 0 ? "font-medium" : "text-muted"}`}>{node.name}</span>
+        <button
+          onClick={() => onDelete(node.id)}
+          className="hidden group-hover:block rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+          title="Удалить категорию"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
       {hasChildren &&
         node.children.map((child) => (
-          <TreeNode key={child.id} node={child} depth={depth + 1} />
+          <TreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} />
         ))}
     </>
   );

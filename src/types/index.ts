@@ -96,7 +96,7 @@ export interface ImportUploadResponse {
   bank: string;
   filename: string;
   created: number;
-  duplicates_skipped: number;
+  replaced: number;
   account_id: number;
   date_from?: string;
   date_to?: string;
