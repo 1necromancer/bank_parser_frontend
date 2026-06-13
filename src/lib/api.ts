@@ -51,15 +51,23 @@ class ApiClient {
 
     if (response.status === 204) return undefined as T;
 
-    if (response.status === 401) {
-      this.onUnauthorized?.();
-      throw new Error("Сессия истекла");
-    }
-
     if (!response.ok) {
       const error = await response
         .json()
-        .catch(() => ({ detail: "Unknown error" }));
+        .catch(() => ({ detail: `HTTP ${response.status}` }));
+
+      if (response.status === 401) {
+        if (this.token) {
+          this.onUnauthorized?.();
+          throw new Error("Сессия истекла");
+        }
+        throw new Error(
+          error.detail === "Incorrect username or password"
+            ? "Неверный email или пароль"
+            : error.detail || "Неверный email или пароль",
+        );
+      }
+
       throw new Error(error.detail || `HTTP ${response.status}`);
     }
 
