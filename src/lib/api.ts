@@ -15,6 +15,33 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8123";
 
+function formatDetail(detail: unknown, status: number): string {
+  if (detail == null) return `HTTP ${status}`;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => (typeof d === "string" ? d : JSON.stringify(d)))
+      .join("; ");
+  }
+  if (typeof detail === "object") {
+    const obj = detail as Record<string, unknown>;
+    if (typeof obj.message === "string") {
+      const extras = { ...obj };
+      delete extras.message;
+      const tail = Object.keys(extras).length
+        ? ` (${JSON.stringify(extras)})`
+        : "";
+      return `${obj.message}${tail}`;
+    }
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return `HTTP ${status}`;
+    }
+  }
+  return String(detail);
+}
+
 class ApiClient {
   private token: string | null = null;
   private onUnauthorized: (() => void) | null = null;
@@ -56,19 +83,21 @@ class ApiClient {
         .json()
         .catch(() => ({ detail: `HTTP ${response.status}` }));
 
+      const detailText = formatDetail(error?.detail, response.status);
+
       if (response.status === 401) {
         if (this.token) {
           this.onUnauthorized?.();
           throw new Error("Сессия истекла");
         }
         throw new Error(
-          error.detail === "Incorrect username or password"
+          detailText === "Incorrect username or password"
             ? "Неверный email или пароль"
-            : error.detail || "Неверный email или пароль",
+            : detailText || "Неверный email или пароль",
         );
       }
 
-      throw new Error(error.detail || `HTTP ${response.status}`);
+      throw new Error(detailText);
     }
 
     return response.json();
