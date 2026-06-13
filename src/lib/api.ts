@@ -228,14 +228,20 @@ class ApiClient {
     return this.request<void>(`/transactions/${id}`, { method: "DELETE" });
   }
 
-  deleteTransactionsByRange(accountId: number, dateFrom: string, dateTo: string) {
-    const p = new URLSearchParams({
-      account_id: String(accountId),
-      date_from: dateFrom,
-      date_to: dateTo,
+  bulkDeleteTransactions(ids: number[]) {
+    return this.request<{ affected: number }>("/transactions/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
     });
-    return this.request<{ deleted: number }>(`/transactions?${p}`, {
-      method: "DELETE",
+  }
+
+  bulkUpdateTransactions(
+    ids: number[],
+    patch: { category_id?: number | null; merchant?: string; description?: string },
+  ) {
+    return this.request<{ affected: number }>("/transactions/bulk-update", {
+      method: "POST",
+      body: JSON.stringify({ ids, ...patch }),
     });
   }
 

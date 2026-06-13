@@ -1,9 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Trash2, Filter, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Filter,
+  X,
+  Pencil,
+  Check,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import type { Account, Category, Transaction } from "@/types";
+
+type Mode = "normal" | "edit" | "delete";
+
+interface PendingEdit {
+  category_id?: number | null;
+}
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -103,10 +117,10 @@ export default function TransactionsPage() {
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
 
-  const [deleteFrom, setDeleteFrom] = useState("");
-  const [deleteTo, setDeleteTo] = useState("");
-  const [deleteAccountId, setDeleteAccountId] = useState("");
-  const [deleteResult, setDeleteResult] = useState<number | null>(null);
+  // Bulk-режимы
+  const [mode, setMode] = useState<Mode>("normal");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [pendingEdit, setPendingEdit] = useState<PendingEdit>({});
 
   const load = useCallback(async () => {
     const params: Record<string, string> = {
@@ -150,7 +164,7 @@ export default function TransactionsPage() {
     api.getAccounts().then(setAccounts).catch(() => {});
   }, []);
 
-  // Сбрасываем страницу на 1 при любой смене фильтров, чтобы не оказаться на пустой странице.
+  // Сбрасываем страницу на 1 при любой смене фильтров.
   useEffect(() => {
     setPage(1);
   }, [
@@ -164,8 +178,23 @@ export default function TransactionsPage() {
     amountMax,
   ]);
 
-  // Активные значения вмёрживаем в списки, чтобы их можно было снять, даже если backend
-  // больше не возвращает соответствующие строки.
+  // При смене страницы и любых фильтров — сбрасываем выбор и pending-правки,
+  // чтобы случайно не применить изменение к строкам, которых пользователь больше не видит.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setPendingEdit({});
+  }, [
+    page,
+    dateFrom,
+    dateTo,
+    bankFilter,
+    merchantContains,
+    descriptionFilter,
+    categoryContains,
+    amountMin,
+    amountMax,
+  ]);
+
   const uniqueBanks = useMemo(
     () =>
       Array.from(
@@ -193,7 +222,42 @@ export default function TransactionsPage() {
     [transactions, descriptionFilter],
   );
 
+  function exitBulkMode() {
+    setMode("normal");
+    setSelectedIds(new Set());
+    setPendingEdit({});
+  }
+
+  function toggleRowSelected(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function togglePageSelected() {
+    const pageIds = transactions.map((t) => t.id);
+    setSelectedIds((prev) => {
+      const allOnPageSelected = pageIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allOnPageSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
   async function handleCategoryChange(txId: number, newCatId: string) {
+    // В edit-режиме изменение распространяется на ВСЕ выделенные строки
+    // и применится только при «Сохранить».
+    if (mode === "edit") {
+      if (!selectedIds.has(txId)) return;
+      const parsed = newCatId ? Number(newCatId) : null;
+      setPendingEdit((prev) => ({ ...prev, category_id: parsed }));
+      return;
+    }
+    // Normal mode — мгновенное inline-сохранение
     try {
       const updated = await api.updateTransaction(txId, {
         category_id: newCatId ? Number(newCatId) : undefined,
@@ -217,26 +281,32 @@ export default function TransactionsPage() {
     }
   }
 
-  async function handleDeleteRange() {
-    if (!deleteAccountId || !deleteFrom || !deleteTo) {
-      alert("Укажите счёт и диапазон дат");
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) {
+      exitBulkMode();
       return;
     }
-    const accName =
-      accounts.find((a) => a.id === Number(deleteAccountId))?.name || deleteAccountId;
-    if (!confirm(`Удалить транзакции по счёту «${accName}» с ${deleteFrom} по ${deleteTo}?`))
-      return;
+    if (!confirm(`Удалить ${selectedIds.size} транзакций?`)) return;
     try {
-      const res = await api.deleteTransactionsByRange(
-        Number(deleteAccountId),
-        deleteFrom,
-        deleteTo,
-      );
-      setDeleteResult(res.deleted);
-      setTimeout(() => setDeleteResult(null), 4000);
+      await api.bulkDeleteTransactions([...selectedIds]);
+      exitBulkMode();
       load();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Ошибка удаления");
+    }
+  }
+
+  async function handleSaveEdits() {
+    if (selectedIds.size === 0 || Object.keys(pendingEdit).length === 0) {
+      exitBulkMode();
+      return;
+    }
+    try {
+      await api.bulkUpdateTransactions([...selectedIds], pendingEdit);
+      exitBulkMode();
+      load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка сохранения");
     }
   }
 
@@ -249,61 +319,94 @@ export default function TransactionsPage() {
   const categoryActive = Boolean(categoryContains);
   const amountActive = Boolean(amountMin || amountMax);
 
+  const showSelectColumn = mode !== "normal";
+  const pageIds = transactions.map((t) => t.id);
+  const allOnPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const someOnPageSelected =
+    !allOnPageSelected && pageIds.some((id) => selectedIds.has(id));
+  const colSpan = 7 + (showSelectColumn ? 1 : 0);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Транзакции</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Транзакции</h1>
 
-      {/* Delete by range */}
-      <div className="rounded-xl bg-surface p-4 shadow-sm border border-border/50">
-        <h3 className="mb-3 text-sm font-semibold text-muted uppercase tracking-wider">
-          Удалить транзакции по диапазону дат
-        </h3>
-        {deleteResult !== null && (
-          <div className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-            Удалено {deleteResult} транзакций
-          </div>
-        )}
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="mb-1 block text-xs text-muted">Счёт</label>
-            <select
-              value={deleteAccountId}
-              onChange={(e) => setDeleteAccountId(e.target.value)}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              <option value="">Выбрать</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">С</label>
-            <input
-              type="date"
-              value={deleteFrom}
-              onChange={(e) => setDeleteFrom(e.target.value)}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">По</label>
-            <input
-              type="date"
-              value={deleteTo}
-              onChange={(e) => setDeleteTo(e.target.value)}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </div>
-          <button
-            onClick={handleDeleteRange}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-600 transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-            Удалить
-          </button>
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-2">
+          {mode === "normal" && (
+            <>
+              <button
+                type="button"
+                onClick={() => setMode("edit")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <Pencil className="h-4 w-4" />
+                Изменить
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("delete")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                Удалить
+              </button>
+            </>
+          )}
+
+          {mode === "edit" && (
+            <>
+              <span className="text-sm text-muted">
+                Выделено: {selectedIds.size}
+                {Object.keys(pendingEdit).length > 0 && " · есть изменения"}
+              </span>
+              <button
+                type="button"
+                onClick={handleSaveEdits}
+                disabled={
+                  selectedIds.size === 0 || Object.keys(pendingEdit).length === 0
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-40 transition-colors"
+              >
+                <Check className="h-4 w-4" />
+                Сохранить ({selectedIds.size})
+              </button>
+              <button
+                type="button"
+                onClick={exitBulkMode}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Отмена
+              </button>
+            </>
+          )}
+
+          {mode === "delete" && (
+            <>
+              <span className="text-sm text-muted">
+                Выделено: {selectedIds.size}
+              </span>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={selectedIds.size === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-40 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                Удалить ({selectedIds.size})
+              </button>
+              <button
+                type="button"
+                onClick={exitBulkMode}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Отмена
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -312,6 +415,19 @@ export default function TransactionsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left">
+              {showSelectColumn && (
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someOnPageSelected;
+                    }}
+                    onChange={togglePageSelected}
+                    aria-label="Выделить всё на странице"
+                  />
+                </th>
+              )}
               <th className="px-4 py-3">
                 <HeaderDropdown label="Дата" active={dateActive}>
                   {() => (
@@ -414,7 +530,9 @@ export default function TransactionsPage() {
                               type="checkbox"
                               checked={descriptionFilter.includes(d)}
                               onChange={() =>
-                                setDescriptionFilter((arr) => toggleInArray(arr, d))
+                                setDescriptionFilter((arr) =>
+                                  toggleInArray(arr, d),
+                                )
                               }
                             />
                             <span className="truncate">{d}</span>
@@ -492,58 +610,91 @@ export default function TransactionsPage() {
                 </HeaderDropdown>
               </th>
 
-              <th className="px-4 py-3 w-10"></th>
+              {mode === "normal" && <th className="w-10 px-4 py-3"></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
-            {transactions.map((tx) => (
-              <tr key={tx.id} className="group hover:bg-gray-50/50 transition-colors">
-                <td className="whitespace-nowrap px-4 py-3 text-muted">{tx.date}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">
-                  {tx.bank_name || "—"}
-                </td>
-                <td className="px-4 py-3 font-medium max-w-48 truncate">
-                  {tx.merchant || "—"}
-                </td>
-                <td className="px-4 py-3 text-muted max-w-64 truncate">
-                  {tx.description || "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <select
-                    value={tx.category_id ?? ""}
-                    onChange={(e) => handleCategoryChange(tx.id, e.target.value)}
-                    className="rounded border border-border/50 px-2 py-1 text-xs focus:border-primary focus:outline-none bg-transparent"
-                  >
-                    <option value="">—</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td
-                  className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${
-                    tx.is_income ? "text-income" : "text-expense"
+            {transactions.map((tx) => {
+              const isSelected = selectedIds.has(tx.id);
+              // В edit-режиме для выделенных строк показываем pending-значение категории
+              const categoryCellValue =
+                mode === "edit" && isSelected && "category_id" in pendingEdit
+                  ? pendingEdit.category_id ?? ""
+                  : tx.category_id ?? "";
+              const categoryDisabled =
+                mode === "delete" || (mode === "edit" && !isSelected);
+
+              return (
+                <tr
+                  key={tx.id}
+                  className={`group transition-colors ${
+                    isSelected ? "bg-primary/5" : "hover:bg-gray-50/50"
                   }`}
                 >
-                  {tx.is_income ? "+" : "−"}
-                  {fmt(Math.abs(tx.amount))} ₸
-                </td>
-                <td className="px-2 py-3">
-                  <button
-                    onClick={() => handleDeleteTransaction(tx.id)}
-                    className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                    title="Удалить"
+                  {showSelectColumn && (
+                    <td className="w-10 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleRowSelected(tx.id)}
+                        aria-label={`Выделить транзакцию #${tx.id}`}
+                      />
+                    </td>
+                  )}
+                  <td className="whitespace-nowrap px-4 py-3 text-muted">
+                    {tx.date}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">
+                    {tx.bank_name || "—"}
+                  </td>
+                  <td className="px-4 py-3 font-medium max-w-48 truncate">
+                    {tx.merchant || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted max-w-64 truncate">
+                    {tx.description || "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={String(categoryCellValue)}
+                      disabled={categoryDisabled}
+                      onChange={(e) =>
+                        handleCategoryChange(tx.id, e.target.value)
+                      }
+                      className="rounded border border-border/50 px-2 py-1 text-xs focus:border-primary focus:outline-none bg-transparent disabled:opacity-50"
+                    >
+                      <option value="">—</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td
+                    className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${
+                      tx.is_income ? "text-income" : "text-expense"
+                    }`}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    {tx.is_income ? "+" : "−"}
+                    {fmt(Math.abs(tx.amount))} ₸
+                  </td>
+                  {mode === "normal" && (
+                    <td className="px-2 py-3">
+                      <button
+                        onClick={() => handleDeleteTransaction(tx.id)}
+                        className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Удалить"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
             {transactions.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-muted">
+                <td colSpan={colSpan} className="py-12 text-center text-muted">
                   Нет транзакций
                 </td>
               </tr>
