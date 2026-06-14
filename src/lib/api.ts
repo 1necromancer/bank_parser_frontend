@@ -164,6 +164,12 @@ class ApiClient {
     );
   }
 
+  getTransactionIds(params: Record<string, string> = {}) {
+    return this.request<number[]>(
+      `/transactions/ids?${new URLSearchParams(params)}`,
+    );
+  }
+
   updateTransaction(
     id: number,
     data: { category_id?: number; merchant?: string; description?: string },

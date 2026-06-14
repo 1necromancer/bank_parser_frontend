@@ -122,29 +122,18 @@ export default function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [pendingEdit, setPendingEdit] = useState<PendingEdit>({});
 
-  const load = useCallback(async () => {
-    const params: Record<string, string> = {
-      page: String(page),
-      per_page: String(perPage),
-    };
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    if (bankFilter.length) params.bank = bankFilter.join(",");
-    if (merchantContains) params.merchant_contains = merchantContains;
-    if (descriptionFilter.length) params.description_in = descriptionFilter.join(",");
-    if (categoryContains) params.category_contains = categoryContains;
-    if (amountMin) params.amount_min = amountMin;
-    if (amountMax) params.amount_max = amountMax;
-
-    try {
-      const res = await api.getTransactions(params);
-      setTransactions(res.transactions);
-      setTotal(res.total);
-    } catch {
-      /* ignore */
-    }
+  const buildFilterParams = useCallback((): Record<string, string> => {
+    const p: Record<string, string> = {};
+    if (dateFrom) p.date_from = dateFrom;
+    if (dateTo) p.date_to = dateTo;
+    if (bankFilter.length) p.bank = bankFilter.join(",");
+    if (merchantContains) p.merchant_contains = merchantContains;
+    if (descriptionFilter.length) p.description_in = descriptionFilter.join(",");
+    if (categoryContains) p.category_contains = categoryContains;
+    if (amountMin) p.amount_min = amountMin;
+    if (amountMax) p.amount_max = amountMax;
+    return p;
   }, [
-    page,
     dateFrom,
     dateTo,
     bankFilter,
@@ -154,6 +143,22 @@ export default function TransactionsPage() {
     amountMin,
     amountMax,
   ]);
+
+  const load = useCallback(async () => {
+    const params: Record<string, string> = {
+      page: String(page),
+      per_page: String(perPage),
+      ...buildFilterParams(),
+    };
+
+    try {
+      const res = await api.getTransactions(params);
+      setTransactions(res.transactions);
+      setTotal(res.total);
+    } catch {
+      /* ignore */
+    }
+  }, [page, buildFilterParams]);
 
   useEffect(() => {
     load();
@@ -178,13 +183,13 @@ export default function TransactionsPage() {
     amountMax,
   ]);
 
-  // При смене страницы и любых фильтров — сбрасываем выбор и pending-правки,
-  // чтобы случайно не применить изменение к строкам, которых пользователь больше не видит.
+  // При смене фильтров (но НЕ страницы) сбрасываем выбор и pending-правки.
+  // Страница не сбрасывает выбор — иначе сломается «выделено все по фильтру»
+  // при пролистывании страниц.
   useEffect(() => {
     setSelectedIds(new Set());
     setPendingEdit({});
   }, [
-    page,
     dateFrom,
     dateTo,
     bankFilter,
@@ -246,6 +251,15 @@ export default function TransactionsPage() {
       else pageIds.forEach((id) => next.add(id));
       return next;
     });
+  }
+
+  async function handleSelectAllMatching() {
+    try {
+      const ids = await api.getTransactionIds(buildFilterParams());
+      setSelectedIds(new Set(ids));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Не удалось выделить все");
+    }
   }
 
   async function handleCategoryChange(txId: number, newCatId: string) {
@@ -326,6 +340,16 @@ export default function TransactionsPage() {
   const someOnPageSelected =
     !allOnPageSelected && pageIds.some((id) => selectedIds.has(id));
   const colSpan = 7 + (showSelectColumn ? 1 : 0);
+
+  // Баннер «выделить всё по фильтру» — показываем только если фильтр выдал
+  // больше, чем помещается на одной странице.
+  const allMatchingSelected = total > 0 && selectedIds.size >= total;
+  const showExpandPrompt =
+    showSelectColumn &&
+    !allMatchingSelected &&
+    allOnPageSelected &&
+    total > pageIds.length;
+  const showBanner = showSelectColumn && (allMatchingSelected || showExpandPrompt);
 
   return (
     <div className="space-y-6">
@@ -409,6 +433,39 @@ export default function TransactionsPage() {
           )}
         </div>
       </div>
+
+      {/* Bulk-select banner */}
+      {showBanner && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+          {allMatchingSelected ? (
+            <>
+              <span>
+                Выделено все <b>{total}</b> транзакций по фильтру
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-primary font-medium hover:underline"
+              >
+                Очистить выделение
+              </button>
+            </>
+          ) : (
+            <>
+              <span>
+                Выделено <b>{selectedIds.size}</b> на странице
+              </span>
+              <button
+                type="button"
+                onClick={handleSelectAllMatching}
+                className="text-primary font-medium hover:underline"
+              >
+                Выделить все {total} по фильтру
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="rounded-xl bg-surface shadow-sm border border-border/50">
