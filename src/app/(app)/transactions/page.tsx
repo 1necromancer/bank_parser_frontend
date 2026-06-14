@@ -9,6 +9,7 @@ import {
   X,
   Pencil,
   Check,
+  Plus,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Account, Category, Transaction } from "@/types";
@@ -96,6 +97,171 @@ function ResetButton({ onClick }: { onClick: () => void }) {
     >
       <X className="h-3 w-3" /> Сбросить
     </button>
+  );
+}
+
+function CategoryPicker({
+  value,
+  categories,
+  disabled,
+  onChange,
+  onCreate,
+}: {
+  value: number | null;
+  categories: Category[];
+  disabled: boolean;
+  onChange: (id: number | null) => void;
+  onCreate: (name: string) => Promise<Category>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handle(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setCreating(false);
+        setNewName("");
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  const current = categories.find((c) => c.id === value);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return categories;
+    return categories.filter((c) => c.name.toLowerCase().includes(q));
+  }, [categories, query]);
+
+  function pick(id: number | null) {
+    onChange(id);
+    setOpen(false);
+    setCreating(false);
+    setNewName("");
+    setQuery("");
+  }
+
+  async function handleCreate(e?: React.FormEvent) {
+    e?.preventDefault();
+    const name = newName.trim();
+    if (!name || saving) return;
+    setSaving(true);
+    try {
+      const created = await onCreate(name);
+      pick(created.id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось создать категорию");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="min-w-[100px] rounded border border-border/50 bg-transparent px-2 py-1 text-left text-xs hover:bg-gray-50 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+      >
+        {current ? current.name : <span className="text-muted">—</span>}
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-surface shadow-lg">
+          {creating ? (
+            <form
+              onSubmit={handleCreate}
+              className="flex items-center gap-1 border-b border-border p-2"
+            >
+              <input
+                autoFocus
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Название категории"
+                className="flex-1 rounded border border-border px-2 py-1 text-sm focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!newName.trim() || saving}
+                className="rounded bg-primary p-1 text-white hover:bg-primary-hover disabled:opacity-40"
+                title="Создать"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(false);
+                  setNewName("");
+                }}
+                className="rounded p-1 text-muted hover:bg-gray-100"
+                title="Отмена"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex w-full items-center gap-1.5 border-b border-border px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+            >
+              <Plus className="h-4 w-4" /> Новая категория
+            </button>
+          )}
+
+          <div className="border-b border-border p-2">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск..."
+              className="w-full rounded border border-border px-2 py-1 text-sm focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => pick(null)}
+              className={`flex w-full items-center px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
+                value === null ? "font-semibold" : "text-muted"
+              }`}
+            >
+              — без категории
+            </button>
+            {filtered.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => pick(c.id)}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
+                  value === c.id ? "font-semibold text-primary" : ""
+                }`}
+              >
+                <span className="truncate">{c.name}</span>
+                {value === c.id && <Check className="h-3.5 w-3.5 shrink-0" />}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-3 py-4 text-center text-xs text-muted">
+                Нет совпадений
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -260,6 +426,14 @@ export default function TransactionsPage() {
     } catch (e) {
       alert(e instanceof Error ? e.message : "Не удалось выделить все");
     }
+  }
+
+  async function handleCreateCategory(name: string): Promise<Category> {
+    const created = await api.createCategory({ name });
+    setCategories((prev) =>
+      [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "ru")),
+    );
+    return created;
   }
 
   async function handleCategoryChange(txId: number, newCatId: string) {
@@ -674,10 +848,10 @@ export default function TransactionsPage() {
             {transactions.map((tx) => {
               const isSelected = selectedIds.has(tx.id);
               // В edit-режиме для выделенных строк показываем pending-значение категории
-              const categoryCellValue =
+              const categoryCellValue: number | null =
                 mode === "edit" && isSelected && "category_id" in pendingEdit
-                  ? pendingEdit.category_id ?? ""
-                  : tx.category_id ?? "";
+                  ? pendingEdit.category_id ?? null
+                  : tx.category_id ?? null;
               const categoryDisabled =
                 mode === "delete" || (mode === "edit" && !isSelected);
 
@@ -711,21 +885,15 @@ export default function TransactionsPage() {
                     {tx.description || "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <select
-                      value={String(categoryCellValue)}
+                    <CategoryPicker
+                      value={categoryCellValue}
+                      categories={categories}
                       disabled={categoryDisabled}
-                      onChange={(e) =>
-                        handleCategoryChange(tx.id, e.target.value)
+                      onChange={(id) =>
+                        handleCategoryChange(tx.id, id !== null ? String(id) : "")
                       }
-                      className="rounded border border-border/50 px-2 py-1 text-xs focus:border-primary focus:outline-none bg-transparent disabled:opacity-50"
-                    >
-                      <option value="">—</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                      onCreate={handleCreateCategory}
+                    />
                   </td>
                   <td
                     className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${
