@@ -211,7 +211,11 @@ class ApiClient {
     return this.request<Rule[]>("/categories/rules");
   }
 
-  createRule(data: { keyword: string; category_id: number }) {
+  createRule(data: {
+    keyword: string;
+    category_id: number;
+    match_type?: "contains" | "exact";
+  }) {
     return this.request<Rule>("/categories/rules", {
       method: "POST",
       body: JSON.stringify(data),

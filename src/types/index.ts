@@ -48,11 +48,14 @@ export interface CategoryTree extends Category {
   children: CategoryTree[];
 }
 
+export type RuleMatchType = "contains" | "exact";
+
 export interface Rule {
   id: number;
   keyword: string;
   category_id: number;
   category_name?: string;
+  match_type: RuleMatchType;
 }
 
 export interface DashboardSummary {

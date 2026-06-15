@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Wand2, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Category, CategoryTree, Rule } from "@/types";
+import type { Category, CategoryTree, Rule, RuleMatchType } from "@/types";
 
 export default function CategoriesPage() {
   const [tree, setTree] = useState<CategoryTree[]>([]);
@@ -13,6 +13,7 @@ export default function CategoriesPage() {
   const [newCatParent, setNewCatParent] = useState("");
   const [newRuleKeyword, setNewRuleKeyword] = useState("");
   const [newRuleCatId, setNewRuleCatId] = useState("");
+  const [newRuleMatch, setNewRuleMatch] = useState<RuleMatchType>("contains");
   const [applyResult, setApplyResult] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -53,9 +54,11 @@ export default function CategoriesPage() {
       await api.createRule({
         keyword: newRuleKeyword.trim(),
         category_id: Number(newRuleCatId),
+        match_type: newRuleMatch,
       });
       setNewRuleKeyword("");
       setNewRuleCatId("");
+      setNewRuleMatch("contains");
       load();
     } catch { /* ignore */ }
   }
@@ -160,58 +163,123 @@ export default function CategoriesPage() {
           )}
 
           <div className="mb-5 space-y-2">
-            {rules.map((rule) => (
-              <div key={rule.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-                <div className="text-sm">
-                  <span className="font-mono text-xs bg-gray-200 rounded px-1.5 py-0.5">{rule.keyword}</span>
-                  <span className="mx-2 text-muted">→</span>
-                  <span className="font-medium">{rule.category_name || `#${rule.category_id}`}</span>
-                </div>
-                <button
-                  onClick={() => handleDeleteRule(rule.id)}
-                  className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+            {rules.map((rule) => {
+              const isExact = (rule.match_type ?? "contains") === "exact";
+              return (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-2 text-sm">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                        isExact
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                      title={
+                        isExact
+                          ? "Точное совпадение"
+                          : "Содержит подстроку"
+                      }
+                    >
+                      {isExact ? "exact" : "contains"}
+                    </span>
+                    <span className="font-mono text-xs bg-gray-200 rounded px-1.5 py-0.5">
+                      {rule.keyword}
+                    </span>
+                    <span className="text-muted">→</span>
+                    <span className="font-medium">
+                      {rule.category_name || `#${rule.category_id}`}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteRule(rule.id)}
+                    className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
             {rules.length === 0 && (
               <p className="py-4 text-center text-sm text-muted">Нет правил</p>
             )}
           </div>
 
-          <form onSubmit={handleCreateRule} className="flex items-end gap-2 border-t border-border pt-4">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-muted">Ключевое слово</label>
-              <input
-                type="text"
-                value={newRuleKeyword}
-                onChange={(e) => setNewRuleKeyword(e.target.value)}
-                placeholder="kaspi gold"
-                className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">Категория</label>
-              <select
-                value={newRuleCatId}
-                onChange={(e) => setNewRuleCatId(e.target.value)}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+          <form
+            onSubmit={handleCreateRule}
+            className="space-y-2 border-t border-border pt-4"
+          >
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs text-muted">
+                  Ключевое слово
+                </label>
+                <input
+                  type="text"
+                  value={newRuleKeyword}
+                  onChange={(e) => setNewRuleKeyword(e.target.value)}
+                  placeholder="kaspi gold"
+                  className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted">Категория</label>
+                <select
+                  value={newRuleCatId}
+                  onChange={(e) => setNewRuleCatId(e.target.value)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+                >
+                  <option value="">Выбрать</option>
+                  {flatCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.parent_id ? "  " : ""}
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="rounded-lg bg-primary p-2 text-white hover:bg-primary-hover transition-colors"
               >
-                <option value="">Выбрать</option>
-                {flatCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.parent_id ? "  " : ""}{c.name}
-                  </option>
-                ))}
-              </select>
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-primary p-2 text-white hover:bg-primary-hover transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted">Совпадение:</span>
+              <div className="inline-flex overflow-hidden rounded-lg border border-border">
+                <button
+                  type="button"
+                  onClick={() => setNewRuleMatch("contains")}
+                  className={`px-2.5 py-1 transition-colors ${
+                    newRuleMatch === "contains"
+                      ? "bg-primary text-white"
+                      : "bg-transparent text-muted hover:bg-gray-50"
+                  }`}
+                >
+                  Содержит
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewRuleMatch("exact")}
+                  className={`px-2.5 py-1 transition-colors ${
+                    newRuleMatch === "exact"
+                      ? "bg-primary text-white"
+                      : "bg-transparent text-muted hover:bg-gray-50"
+                  }`}
+                >
+                  Точно
+                </button>
+              </div>
+              <span className="text-muted">
+                {newRuleMatch === "contains"
+                  ? "— подстрока в получателе или описании"
+                  : "— полное совпадение (без учёта регистра)"}
+              </span>
+            </div>
           </form>
         </div>
       </div>
