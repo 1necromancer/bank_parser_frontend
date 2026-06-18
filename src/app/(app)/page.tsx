@@ -276,7 +276,6 @@ export default function DashboardPage() {
     const top = sorted.slice(0, categoriesTopN);
     const rest = sorted.slice(categoriesTopN);
     const others: CategoryChartItem = {
-      category_id: null,
       category_name: `Прочие (${rest.length})`,
       total: rest.reduce((s, c) => s + c.total, 0),
       percentage: rest.reduce((s, c) => s + c.percentage, 0),
