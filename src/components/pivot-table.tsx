@@ -88,6 +88,9 @@ export default function PivotTable({ data }: Props) {
             <th className="sticky left-0 z-10 bg-surface py-2 pl-2 pr-4 text-left font-medium">
               Категория / получатель
             </th>
+            <th className="bg-surface py-2 pl-2 pr-3 text-right font-medium">
+              Итого
+            </th>
             {periods.map((p) => (
               <th
                 key={p}
@@ -97,7 +100,6 @@ export default function PivotTable({ data }: Props) {
                 {formatPeriodLabel(p, granularity)}
               </th>
             ))}
-            <th className="py-2 pl-2 pr-2 text-right font-medium">Итого</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/40">
@@ -160,6 +162,10 @@ function SideRows({
             </span>
           </span>
         </td>
+        <td className={`${bg} py-2.5 pl-2 pr-3 text-right font-bold tabular-nums ${colorText}`}>
+          {isIncome ? "+" : "−"}
+          {fmt(side.total)}
+        </td>
         {periods.map((p) => (
           <td
             key={p}
@@ -168,10 +174,6 @@ function SideRows({
             {fmt(side.by_period[p] ?? 0)}
           </td>
         ))}
-        <td className={`py-2.5 pl-2 pr-2 text-right font-bold tabular-nums ${colorText}`}>
-          {isIncome ? "+" : "−"}
-          {fmt(side.total)}
-        </td>
       </tr>
       {isOpen &&
         side.categories.map((node) => (
@@ -238,6 +240,11 @@ function CategoryRows({
             </span>
           </span>
         </td>
+        <td
+          className={`bg-surface py-2 pl-2 pr-3 text-right font-semibold tabular-nums ${colorText}`}
+        >
+          {fmt(node.total)}
+        </td>
         {periods.map((p) => (
           <td
             key={p}
@@ -246,11 +253,6 @@ function CategoryRows({
             {fmt(node.by_period[p] ?? 0)}
           </td>
         ))}
-        <td
-          className={`py-2 pl-2 pr-2 text-right font-semibold tabular-nums ${colorText}`}
-        >
-          {fmt(node.total)}
-        </td>
       </tr>
 
       {isOpen &&
@@ -279,6 +281,11 @@ function CategoryRows({
                 <span className="truncate">{item.merchant || "—"}</span>
               </span>
             </td>
+            <td
+              className={`bg-surface py-1.5 pl-2 pr-3 text-right font-medium tabular-nums opacity-80 ${colorText}`}
+            >
+              {fmt(item.total)}
+            </td>
             {periods.map((p) => (
               <td
                 key={p}
@@ -287,11 +294,6 @@ function CategoryRows({
                 {fmt(item.by_period[p] ?? 0)}
               </td>
             ))}
-            <td
-              className={`py-1.5 pl-2 pr-2 text-right tabular-nums opacity-80 ${colorText}`}
-            >
-              {fmt(item.total)}
-            </td>
           </tr>
         ))}
     </>

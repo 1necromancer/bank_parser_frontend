@@ -281,6 +281,13 @@ class ApiClient {
     return this.request<Account[]>("/accounts");
   }
 
+  updateAccount(id: number, data: { name?: string }) {
+    return this.request<Account>(`/accounts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   deleteAccount(id: number) {
     return this.request<void>(`/accounts/${id}`, { method: "DELETE" });
   }
