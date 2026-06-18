@@ -14,13 +14,15 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, RefreshCw, Table2 } from "lucide-react";
 import { api } from "@/lib/api";
 import StatsCard from "@/components/stats-card";
+import PivotTable from "@/components/pivot-table";
 import type {
   CashflowPoint,
   CategoryBreakdown,
   DashboardSummary,
+  PivotResponse,
   RecurringTransaction,
 } from "@/types";
 
@@ -41,6 +43,7 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<CategoryBreakdown[]>([]);
   const [cashflow, setCashflow] = useState<CashflowPoint[]>([]);
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
+  const [pivot, setPivot] = useState<PivotResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -50,6 +53,7 @@ export default function DashboardPage() {
       api.getCategoryBreakdown(),
       api.getCashflow("monthly"),
       api.getRecurring(),
+      api.getPivot(),
     ]);
 
     if (results[0].status === "fulfilled") setSummary(results[0].value);
@@ -63,6 +67,9 @@ export default function DashboardPage() {
 
     if (results[3].status === "fulfilled") setRecurring(results[3].value);
     else console.error("dashboard/recurring:", results[3].reason);
+
+    if (results[4].status === "fulfilled") setPivot(results[4].value);
+    else console.error("dashboard/pivot:", results[4].reason);
 
     setLoading(false);
   }, []);
@@ -171,6 +178,17 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Pivot table */}
+      {pivot && (
+        <div className="rounded-xl bg-surface p-5 shadow-sm border border-border/50">
+          <h2 className="mb-4 text-sm font-semibold text-muted uppercase tracking-wider">
+            <Table2 className="mr-2 inline h-4 w-4" />
+            Сводная таблица
+          </h2>
+          <PivotTable data={pivot} />
+        </div>
+      )}
 
       {/* Recurring */}
       {recurring.length > 0 && (

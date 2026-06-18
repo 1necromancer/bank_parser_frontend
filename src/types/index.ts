@@ -95,6 +95,33 @@ export interface RecurringTransaction {
   occurrences: number;
 }
 
+export interface PivotItem {
+  merchant: string;
+  total: number;
+  count: number;
+}
+
+export interface PivotCategoryNode {
+  category_id: number | null;
+  name: string;
+  total: number;
+  count: number;
+  items: PivotItem[];
+  children: PivotCategoryNode[];
+}
+
+export interface PivotSide {
+  kind: "income" | "expense";
+  total: number;
+  count: number;
+  categories: PivotCategoryNode[];
+}
+
+export interface PivotResponse {
+  income: PivotSide;
+  expense: PivotSide;
+}
+
 export interface ImportUploadResponse {
   import_id: number;
   bank: string;

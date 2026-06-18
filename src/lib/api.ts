@@ -6,6 +6,7 @@ import type {
   CashflowResponse,
   DashboardSummary,
   ImportUploadResponse,
+  PivotResponse,
   RecurringTransaction,
   Rule,
   Transaction,
@@ -155,6 +156,13 @@ class ApiClient {
     return this.request<RecurringTransaction[]>(
       `/dashboard/recurring?min_occurrences=${minOccurrences}`,
     );
+  }
+
+  getPivot(dateFrom?: string, dateTo?: string) {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return this.request<PivotResponse>(`/dashboard/pivot?${p}`);
   }
 
   // ---- Transactions ----
