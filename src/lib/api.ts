@@ -222,6 +222,16 @@ class ApiClient {
     });
   }
 
+  updateCategory(
+    id: number,
+    data: { name?: string; parent_id?: number | null; icon?: string | null },
+  ) {
+    return this.request<Category>(`/categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   // ---- Rules ----
   getRules() {
     return this.request<Rule[]>("/categories/rules");
