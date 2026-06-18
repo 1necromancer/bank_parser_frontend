@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -53,6 +53,48 @@ function fmt(n: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+// Узел графика «по категориям» — топ-N + опциональный «Прочие» с
+// прикреплённым breakdown для подсказки.
+interface CategoryChartItem extends CategoryBreakdown {
+  _isOthers?: boolean;
+  _breakdown?: CategoryBreakdown[];
+}
+
+function CategoryPieTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: CategoryChartItem }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0].payload;
+  return (
+    <div className="max-w-xs rounded-lg border border-border bg-white p-3 text-xs shadow-lg">
+      <p className="font-semibold">{item.category_name}</p>
+      <p className="mt-0.5 text-muted">
+        {fmt(item.total)} ₸ · {item.percentage.toFixed(1)}% ·{" "}
+        {item.transactions_count} транз.
+      </p>
+      {item._isOthers && item._breakdown && item._breakdown.length > 0 && (
+        <div className="mt-2 max-h-56 space-y-1 overflow-y-auto border-t border-border pt-2">
+          {item._breakdown.map((c) => (
+            <div
+              key={c.category_id ?? c.category_name}
+              className="flex items-center justify-between gap-3"
+            >
+              <span className="truncate">{c.category_name}</span>
+              <span className="shrink-0 tabular-nums text-muted">
+                {fmt(c.total)} ₸
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PivotFilters({
@@ -224,6 +266,26 @@ export default function DashboardPage() {
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoriesTopN, setCategoriesTopN] = useState(5);
+
+  // Берём топ-N категорий, остальные складываем в синтетический «Прочие»
+  // с прикреплённым breakdown — для подсказки при hover.
+  const categoriesChartData = useMemo<CategoryChartItem[]>(() => {
+    const sorted = [...categories].sort((a, b) => b.total - a.total);
+    if (sorted.length <= categoriesTopN) return sorted;
+    const top = sorted.slice(0, categoriesTopN);
+    const rest = sorted.slice(categoriesTopN);
+    const others: CategoryChartItem = {
+      category_id: null,
+      category_name: `Прочие (${rest.length})`,
+      total: rest.reduce((s, c) => s + c.total, 0),
+      percentage: rest.reduce((s, c) => s + c.percentage, 0),
+      transactions_count: rest.reduce((s, c) => s + c.transactions_count, 0),
+      _isOthers: true,
+      _breakdown: rest,
+    };
+    return [...top, others];
+  }, [categories, categoriesTopN]);
 
   // Pivot-фильтры (применяются только к pivot, остальное — без изменений)
   const [pivot, setPivot] = useState<PivotResponse | null>(null);
@@ -345,14 +407,35 @@ export default function DashboardPage() {
 
         {/* Categories pie */}
         <div className="rounded-xl bg-surface p-5 shadow-sm border border-border/50">
-          <h2 className="mb-4 text-sm font-semibold text-muted uppercase tracking-wider">
-            Расходы по категориям
-          </h2>
-          {categories.length > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider">
+              Расходы по категориям
+            </h2>
+            <label className="flex items-center gap-2 text-xs text-muted">
+              Топ
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={categoriesTopN}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (Number.isFinite(v) && v >= 1) {
+                    setCategoriesTopN(Math.min(50, v));
+                  }
+                }}
+                className="w-14 rounded border border-border px-2 py-0.5 text-center text-xs focus:border-primary focus:outline-none"
+              />
+              <span>
+                из <b>{categories.length}</b>
+              </span>
+            </label>
+          </div>
+          {categoriesChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
-                  data={categories}
+                  data={categoriesChartData}
                   dataKey="total"
                   nameKey="category_name"
                   cx="50%"
@@ -367,11 +450,18 @@ export default function DashboardPage() {
                   }}
                   labelLine={false}
                 >
-                  {categories.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  {categoriesChartData.map((d, i) => (
+                    <Cell
+                      key={i}
+                      fill={
+                        d._isOthers
+                          ? "#94a3b8"
+                          : PIE_COLORS[i % PIE_COLORS.length]
+                      }
+                    />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => fmt(Number(v))} />
+                <Tooltip content={<CategoryPieTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
