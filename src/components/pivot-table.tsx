@@ -2,13 +2,51 @@
 
 import { useState } from "react";
 import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
-import type { PivotCategoryNode, PivotResponse, PivotSide } from "@/types";
+import type {
+  PivotCategoryNode,
+  PivotGranularity,
+  PivotResponse,
+  PivotSide,
+} from "@/types";
 
 function fmt(n: number) {
+  if (!n) return "—";
   return new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+const MONTH_SHORT = [
+  "янв",
+  "фев",
+  "мар",
+  "апр",
+  "май",
+  "июн",
+  "июл",
+  "авг",
+  "сен",
+  "окт",
+  "ноя",
+  "дек",
+];
+
+function formatPeriodLabel(period: string, granularity: PivotGranularity): string {
+  if (granularity === "year") return period;
+  if (granularity === "month") {
+    const [y, m] = period.split("-");
+    return `${MONTH_SHORT[parseInt(m, 10) - 1]} ${y.slice(-2)}`;
+  }
+  if (granularity === "week") {
+    // "2026-W03" → "W03 26"
+    const m = period.match(/^(\d+)-W(\d+)$/);
+    if (!m) return period;
+    return `W${m[2]} ${m[1].slice(-2)}`;
+  }
+  // day "2026-01-15" → "15 янв"
+  const [, mm, dd] = period.split("-");
+  return `${parseInt(dd, 10)} ${MONTH_SHORT[parseInt(mm, 10) - 1]}`;
 }
 
 interface Props {
@@ -16,11 +54,9 @@ interface Props {
 }
 
 export default function PivotTable({ data }: Props) {
-  // Свёрнутые ноды храним по уникальному ключу. По умолчанию свёрнуто всё
-  // кроме двух корней — иначе на больших деревьях рендер становится тяжёлым.
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    return collectAllKeys(data);
-  });
+  const [collapsed, setCollapsed] = useState<Set<string>>(() =>
+    collectAllKeys(data),
+  );
 
   function toggle(key: string) {
     setCollapsed((prev) => {
@@ -36,27 +72,46 @@ export default function PivotTable({ data }: Props) {
     return <p className="py-12 text-center text-sm text-muted">Нет данных</p>;
   }
 
+  const { periods, granularity } = data;
+  const periodWidth = granularity === "day" ? 70 : 90;
+  // min-width: 220 (name) + N * periodWidth + 110 (total)
+  const minW = 220 + periods.length * periodWidth + 110;
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table
+        className="w-full text-sm"
+        style={{ minWidth: `${minW}px` }}
+      >
         <thead>
-          <tr className="border-b border-border text-left text-xs uppercase text-muted">
-            <th className="py-2 pl-2 pr-4 font-medium">Категория / получатель</th>
-            <th className="py-2 pr-4 text-right font-medium">Сумма</th>
-            <th className="py-2 pr-4 text-right font-medium">% стороны</th>
-            <th className="py-2 pr-2 text-right font-medium">Транз.</th>
+          <tr className="border-b border-border text-xs uppercase text-muted">
+            <th className="sticky left-0 z-10 bg-surface py-2 pl-2 pr-4 text-left font-medium">
+              Категория / получатель
+            </th>
+            {periods.map((p) => (
+              <th
+                key={p}
+                className="py-2 px-2 text-right font-medium tabular-nums"
+                style={{ minWidth: `${periodWidth}px` }}
+              >
+                {formatPeriodLabel(p, granularity)}
+              </th>
+            ))}
+            <th className="py-2 pl-2 pr-2 text-right font-medium">Итого</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/40">
           <SideRows
             side={data.income}
             sideKey="income"
+            periods={periods}
             collapsed={collapsed}
             onToggle={toggle}
           />
           <SideRows
             side={data.expense}
             sideKey="expense"
+            periods={periods}
             collapsed={collapsed}
             onToggle={toggle}
           />
@@ -69,27 +124,26 @@ export default function PivotTable({ data }: Props) {
 function SideRows({
   side,
   sideKey,
+  periods,
   collapsed,
   onToggle,
 }: {
   side: PivotSide;
   sideKey: "income" | "expense";
+  periods: string[];
   collapsed: Set<string>;
   onToggle: (key: string) => void;
 }) {
   const rootKey = `side:${sideKey}`;
   const isOpen = !collapsed.has(rootKey);
   const isIncome = sideKey === "income";
+  const bg = isIncome ? "bg-green-50/70" : "bg-red-50/70";
+  const colorText = isIncome ? "text-income" : "text-expense";
 
   return (
     <>
-      <tr
-        className={`cursor-pointer ${
-          isIncome ? "bg-green-50/50" : "bg-red-50/50"
-        }`}
-        onClick={() => onToggle(rootKey)}
-      >
-        <td className="py-2.5 pl-2 pr-4">
+      <tr className={`cursor-pointer ${bg}`} onClick={() => onToggle(rootKey)}>
+        <td className={`sticky left-0 z-10 ${bg} py-2.5 pl-2 pr-4`}>
           <span className="inline-flex items-center gap-2">
             <ChevronRight
               className={`h-3.5 w-3.5 text-muted transition-transform ${
@@ -101,31 +155,33 @@ function SideRows({
             ) : (
               <TrendingDown className="h-4 w-4 text-expense" />
             )}
-            <span className="font-semibold uppercase tracking-wider text-xs">
+            <span className="text-xs font-semibold uppercase tracking-wider">
               {isIncome ? "Доходы" : "Расходы"}
             </span>
           </span>
         </td>
-        <td
-          className={`py-2.5 pr-4 text-right font-semibold ${
-            isIncome ? "text-income" : "text-expense"
-          }`}
-        >
+        {periods.map((p) => (
+          <td
+            key={p}
+            className={`py-2.5 px-2 text-right font-semibold tabular-nums ${colorText}`}
+          >
+            {fmt(side.by_period[p] ?? 0)}
+          </td>
+        ))}
+        <td className={`py-2.5 pl-2 pr-2 text-right font-bold tabular-nums ${colorText}`}>
           {isIncome ? "+" : "−"}
-          {fmt(side.total)} ₸
+          {fmt(side.total)}
         </td>
-        <td className="py-2.5 pr-4 text-right text-muted">100%</td>
-        <td className="py-2.5 pr-2 text-right text-muted">{side.count}</td>
       </tr>
       {isOpen &&
         side.categories.map((node) => (
           <CategoryRows
             key={`${sideKey}:c:${node.category_id ?? "none"}`}
             node={node}
-            sideTotal={side.total}
             isIncome={isIncome}
             depth={1}
             parentPath={sideKey}
+            periods={periods}
             collapsed={collapsed}
             onToggle={onToggle}
           />
@@ -136,26 +192,26 @@ function SideRows({
 
 function CategoryRows({
   node,
-  sideTotal,
   isIncome,
   depth,
   parentPath,
+  periods,
   collapsed,
   onToggle,
 }: {
   node: PivotCategoryNode;
-  sideTotal: number;
   isIncome: boolean;
   depth: number;
   parentPath: string;
+  periods: string[];
   collapsed: Set<string>;
   onToggle: (key: string) => void;
 }) {
   const path = `${parentPath}/${node.category_id ?? "none"}`;
   const hasChildren = node.children.length > 0 || node.items.length > 0;
   const isOpen = !collapsed.has(path);
-  const pct = sideTotal > 0 ? (node.total / sideTotal) * 100 : 0;
   const pad = 8 + depth * 18;
+  const colorText = isIncome ? "text-income" : "text-expense";
 
   return (
     <>
@@ -163,7 +219,7 @@ function CategoryRows({
         className={`${hasChildren ? "cursor-pointer" : ""} hover:bg-gray-50/60`}
         onClick={() => hasChildren && onToggle(path)}
       >
-        <td className="py-2 pl-2 pr-4">
+        <td className="sticky left-0 z-10 bg-surface py-2 pl-2 pr-4">
           <span
             className="inline-flex items-center gap-1.5"
             style={{ paddingLeft: pad }}
@@ -177,23 +233,23 @@ function CategoryRows({
             ) : (
               <span className="inline-block w-3.5" />
             )}
-            <span className={depth === 1 ? "font-medium" : ""}>
+            <span className={`truncate ${depth === 1 ? "font-medium" : ""}`}>
               {node.name}
             </span>
           </span>
         </td>
+        {periods.map((p) => (
+          <td
+            key={p}
+            className={`py-2 px-2 text-right tabular-nums ${colorText}`}
+          >
+            {fmt(node.by_period[p] ?? 0)}
+          </td>
+        ))}
         <td
-          className={`py-2 pr-4 text-right tabular-nums ${
-            depth === 1 ? "font-semibold" : ""
-          } ${isIncome ? "text-income" : "text-expense"}`}
+          className={`py-2 pl-2 pr-2 text-right font-semibold tabular-nums ${colorText}`}
         >
-          {fmt(node.total)} ₸
-        </td>
-        <td className="py-2 pr-4 text-right text-muted tabular-nums">
-          {pct.toFixed(1)}%
-        </td>
-        <td className="py-2 pr-2 text-right text-muted tabular-nums">
-          {node.count}
+          {fmt(node.total)}
         </td>
       </tr>
 
@@ -202,51 +258,47 @@ function CategoryRows({
           <CategoryRows
             key={`c:${child.category_id ?? "none"}-${child.name}`}
             node={child}
-            sideTotal={sideTotal}
             isIncome={isIncome}
             depth={depth + 1}
             parentPath={path}
+            periods={periods}
             collapsed={collapsed}
             onToggle={onToggle}
           />
         ))}
 
       {isOpen &&
-        node.items.map((item, i) => {
-          const itemPct = sideTotal > 0 ? (item.total / sideTotal) * 100 : 0;
-          return (
-            <tr key={`${path}/i/${i}`} className="hover:bg-gray-50/60">
-              <td className="py-1.5 pl-2 pr-4">
-                <span
-                  className="inline-flex items-center gap-1.5 text-muted"
-                  style={{ paddingLeft: pad + 18 }}
-                >
-                  <span className="inline-block w-3.5" />
-                  <span className="truncate">{item.merchant || "—"}</span>
-                </span>
-              </td>
-              <td
-                className={`py-1.5 pr-4 text-right tabular-nums ${
-                  isIncome ? "text-income/80" : "text-expense/80"
-                }`}
+        node.items.map((item, i) => (
+          <tr key={`${path}/i/${i}`} className="hover:bg-gray-50/60">
+            <td className="sticky left-0 z-10 bg-surface py-1.5 pl-2 pr-4">
+              <span
+                className="inline-flex items-center gap-1.5 text-muted"
+                style={{ paddingLeft: pad + 18 }}
               >
-                {fmt(item.total)} ₸
+                <span className="inline-block w-3.5" />
+                <span className="truncate">{item.merchant || "—"}</span>
+              </span>
+            </td>
+            {periods.map((p) => (
+              <td
+                key={p}
+                className={`py-1.5 px-2 text-right tabular-nums opacity-80 ${colorText}`}
+              >
+                {fmt(item.by_period[p] ?? 0)}
               </td>
-              <td className="py-1.5 pr-4 text-right text-muted tabular-nums">
-                {itemPct.toFixed(1)}%
-              </td>
-              <td className="py-1.5 pr-2 text-right text-muted tabular-nums">
-                {item.count}
-              </td>
-            </tr>
-          );
-        })}
+            ))}
+            <td
+              className={`py-1.5 pl-2 pr-2 text-right tabular-nums opacity-80 ${colorText}`}
+            >
+              {fmt(item.total)}
+            </td>
+          </tr>
+        ))}
     </>
   );
 }
 
 function collectAllKeys(data: PivotResponse): Set<string> {
-  // Сворачиваем всё, КРОМЕ двух корней (Доходы / Расходы).
   const keys = new Set<string>();
   function walk(node: PivotCategoryNode, prefix: string) {
     const key = `${prefix}/${node.category_id ?? "none"}`;

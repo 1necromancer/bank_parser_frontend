@@ -158,10 +158,18 @@ class ApiClient {
     );
   }
 
-  getPivot(dateFrom?: string, dateTo?: string) {
+  getPivot(opts: {
+    granularity?: "day" | "week" | "month" | "year";
+    dateFrom?: string;
+    dateTo?: string;
+    accountIds?: number[];
+  } = {}) {
     const p = new URLSearchParams();
-    if (dateFrom) p.set("date_from", dateFrom);
-    if (dateTo) p.set("date_to", dateTo);
+    if (opts.granularity) p.set("granularity", opts.granularity);
+    if (opts.dateFrom) p.set("date_from", opts.dateFrom);
+    if (opts.dateTo) p.set("date_to", opts.dateTo);
+    if (opts.accountIds?.length)
+      p.set("account_id", opts.accountIds.join(","));
     return this.request<PivotResponse>(`/dashboard/pivot?${p}`);
   }
 

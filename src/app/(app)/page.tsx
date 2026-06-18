@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -14,14 +14,24 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, RefreshCw, Table2 } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  RefreshCw,
+  Table2,
+  Filter,
+  X,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import StatsCard from "@/components/stats-card";
 import PivotTable from "@/components/pivot-table";
 import type {
+  Account,
   CashflowPoint,
   CategoryBreakdown,
   DashboardSummary,
+  PivotGranularity,
   PivotResponse,
   RecurringTransaction,
 } from "@/types";
@@ -31,6 +41,13 @@ const PIE_COLORS = [
   "#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#6366f1",
 ];
 
+const GRANULARITY_LABELS: Record<PivotGranularity, string> = {
+  day: "День",
+  week: "Неделя",
+  month: "Месяц",
+  year: "Год",
+};
+
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 0,
@@ -38,13 +55,183 @@ function fmt(n: number) {
   }).format(n);
 }
 
+function PivotFilters({
+  granularity,
+  onGranularity,
+  dateFrom,
+  dateTo,
+  onDateFrom,
+  onDateTo,
+  accounts,
+  accountIds,
+  onAccountIds,
+}: {
+  granularity: PivotGranularity;
+  onGranularity: (g: PivotGranularity) => void;
+  dateFrom: string;
+  dateTo: string;
+  onDateFrom: (v: string) => void;
+  onDateTo: (v: string) => void;
+  accounts: Account[];
+  accountIds: number[];
+  onAccountIds: (ids: number[]) => void;
+}) {
+  const [accOpen, setAccOpen] = useState(false);
+  const accRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accOpen) return;
+    function handle(e: MouseEvent) {
+      if (!accRef.current?.contains(e.target as Node)) setAccOpen(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [accOpen]);
+
+  function toggleAccount(id: number) {
+    onAccountIds(
+      accountIds.includes(id)
+        ? accountIds.filter((x) => x !== id)
+        : [...accountIds, id],
+    );
+  }
+
+  const accLabel =
+    accountIds.length === 0
+      ? "Все счета"
+      : accountIds.length === 1
+        ? accounts.find((a) => a.id === accountIds[0])?.name ?? "1 счёт"
+        : `${accountIds.length} счетов`;
+
+  const hasAnyFilter =
+    accountIds.length > 0 || Boolean(dateFrom) || Boolean(dateTo);
+
+  return (
+    <div className="mb-4 flex flex-wrap items-end gap-3">
+      {/* Granularity */}
+      <div>
+        <label className="mb-1 block text-xs text-muted">Период</label>
+        <div className="inline-flex overflow-hidden rounded-lg border border-border">
+          {(Object.keys(GRANULARITY_LABELS) as PivotGranularity[]).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => onGranularity(g)}
+              className={`px-2.5 py-1.5 text-xs transition-colors ${
+                granularity === g
+                  ? "bg-primary text-white"
+                  : "bg-transparent text-muted hover:bg-gray-50"
+              }`}
+            >
+              {GRANULARITY_LABELS[g]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Date range */}
+      <div>
+        <label className="mb-1 block text-xs text-muted">С</label>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => onDateFrom(e.target.value)}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs text-muted">По</label>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => onDateTo(e.target.value)}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
+        />
+      </div>
+
+      {/* Accounts multi-select */}
+      <div ref={accRef} className="relative">
+        <label className="mb-1 block text-xs text-muted">Счета</label>
+        <button
+          type="button"
+          onClick={() => setAccOpen((o) => !o)}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+            accountIds.length > 0
+              ? "border-primary/40 bg-primary/5 text-primary"
+              : "border-border hover:bg-gray-50"
+          }`}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          {accLabel}
+        </button>
+        {accOpen && (
+          <div className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface p-3 shadow-lg">
+            <div className="max-h-64 space-y-1.5 overflow-y-auto">
+              {accounts.length === 0 && (
+                <p className="text-xs text-muted">Нет счетов</p>
+              )}
+              {accounts.map((a) => (
+                <label
+                  key={a.id}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={accountIds.includes(a.id)}
+                    onChange={() => toggleAccount(a.id)}
+                  />
+                  <span className="truncate">
+                    {a.name}{" "}
+                    <span className="text-xs text-muted">({a.bank_name})</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {accountIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onAccountIds([])}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-muted hover:text-red-500"
+              >
+                <X className="h-3 w-3" /> Сбросить
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {hasAnyFilter && (
+        <button
+          type="button"
+          onClick={() => {
+            onDateFrom("");
+            onDateTo("");
+            onAccountIds([]);
+          }}
+          className="inline-flex items-center gap-1 self-end pb-2 text-xs text-muted hover:text-red-500 transition-colors"
+        >
+          <X className="h-3 w-3" /> Сбросить фильтры
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [categories, setCategories] = useState<CategoryBreakdown[]>([]);
   const [cashflow, setCashflow] = useState<CashflowPoint[]>([]);
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
-  const [pivot, setPivot] = useState<PivotResponse | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Pivot-фильтры (применяются только к pivot, остальное — без изменений)
+  const [pivot, setPivot] = useState<PivotResponse | null>(null);
+  const [pivotLoading, setPivotLoading] = useState(false);
+  const [granularity, setGranularity] = useState<PivotGranularity>("month");
+  const [pivotDateFrom, setPivotDateFrom] = useState("");
+  const [pivotDateTo, setPivotDateTo] = useState("");
+  const [pivotAccountIds, setPivotAccountIds] = useState<number[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,7 +240,7 @@ export default function DashboardPage() {
       api.getCategoryBreakdown(),
       api.getCashflow("monthly"),
       api.getRecurring(),
-      api.getPivot(),
+      api.getAccounts(),
     ]);
 
     if (results[0].status === "fulfilled") setSummary(results[0].value);
@@ -68,13 +255,27 @@ export default function DashboardPage() {
     if (results[3].status === "fulfilled") setRecurring(results[3].value);
     else console.error("dashboard/recurring:", results[3].reason);
 
-    if (results[4].status === "fulfilled") setPivot(results[4].value);
-    else console.error("dashboard/pivot:", results[4].reason);
+    if (results[4].status === "fulfilled") setAccounts(results[4].value);
+    else console.error("dashboard/accounts:", results[4].reason);
 
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setPivotLoading(true);
+    api
+      .getPivot({
+        granularity,
+        dateFrom: pivotDateFrom || undefined,
+        dateTo: pivotDateTo || undefined,
+        accountIds: pivotAccountIds.length ? pivotAccountIds : undefined,
+      })
+      .then(setPivot)
+      .catch((e) => console.error("dashboard/pivot:", e))
+      .finally(() => setPivotLoading(false));
+  }, [granularity, pivotDateFrom, pivotDateTo, pivotAccountIds]);
 
   if (loading) {
     return (
@@ -180,15 +381,35 @@ export default function DashboardPage() {
       </div>
 
       {/* Pivot table */}
-      {pivot && (
-        <div className="rounded-xl bg-surface p-5 shadow-sm border border-border/50">
-          <h2 className="mb-4 text-sm font-semibold text-muted uppercase tracking-wider">
+      <div className="rounded-xl bg-surface p-5 shadow-sm border border-border/50">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider">
             <Table2 className="mr-2 inline h-4 w-4" />
             Сводная таблица
           </h2>
-          <PivotTable data={pivot} />
+          {pivotLoading && (
+            <span className="text-xs text-muted">Загрузка...</span>
+          )}
         </div>
-      )}
+
+        <PivotFilters
+          granularity={granularity}
+          onGranularity={setGranularity}
+          dateFrom={pivotDateFrom}
+          dateTo={pivotDateTo}
+          onDateFrom={setPivotDateFrom}
+          onDateTo={setPivotDateTo}
+          accounts={accounts}
+          accountIds={pivotAccountIds}
+          onAccountIds={setPivotAccountIds}
+        />
+
+        {pivot ? (
+          <PivotTable data={pivot} />
+        ) : (
+          <p className="py-12 text-center text-sm text-muted">Загрузка...</p>
+        )}
+      </div>
 
       {/* Recurring */}
       {recurring.length > 0 && (

@@ -95,10 +95,13 @@ export interface RecurringTransaction {
   occurrences: number;
 }
 
+export type PivotGranularity = "day" | "week" | "month" | "year";
+
 export interface PivotItem {
   merchant: string;
   total: number;
   count: number;
+  by_period: Record<string, number>;
 }
 
 export interface PivotCategoryNode {
@@ -106,6 +109,7 @@ export interface PivotCategoryNode {
   name: string;
   total: number;
   count: number;
+  by_period: Record<string, number>;
   items: PivotItem[];
   children: PivotCategoryNode[];
 }
@@ -114,12 +118,15 @@ export interface PivotSide {
   kind: "income" | "expense";
   total: number;
   count: number;
+  by_period: Record<string, number>;
   categories: PivotCategoryNode[];
 }
 
 export interface PivotResponse {
   income: PivotSide;
   expense: PivotSide;
+  periods: string[];
+  granularity: PivotGranularity;
 }
 
 export interface ImportUploadResponse {
