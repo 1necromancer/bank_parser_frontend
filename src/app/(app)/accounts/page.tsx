@@ -50,7 +50,7 @@ export default function AccountsPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(acc.id, acc.name)}
-                  className="hidden group-hover:block rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+                  className="block shrink-0 rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-500 transition-colors sm:hidden sm:group-hover:block"
                   title="Удалить счёт"
                 >
                   <Trash2 className="h-4 w-4" />

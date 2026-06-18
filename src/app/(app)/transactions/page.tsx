@@ -77,7 +77,7 @@ function HeaderDropdown({
       </button>
       {open && (
         <div
-          className={`absolute z-20 mt-1 ${width} rounded-lg border border-border bg-surface p-3 text-left shadow-lg ${
+          className={`absolute z-20 mt-1 ${width} max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface p-3 text-left shadow-lg ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -176,7 +176,7 @@ function CategoryPicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-surface shadow-lg">
+        <div className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface shadow-lg">
           {creating ? (
             <form
               onSubmit={handleCreate}
@@ -642,8 +642,8 @@ export default function TransactionsPage() {
       )}
 
       {/* Table */}
-      <div className="rounded-xl bg-surface shadow-sm border border-border/50">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl bg-surface shadow-sm border border-border/50">
+        <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr className="border-b border-border text-left">
               {showSelectColumn && (
@@ -930,7 +930,7 @@ export default function TransactionsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-col items-stretch gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-muted">
             {total} транзакций · стр. {page} из {totalPages}
           </span>

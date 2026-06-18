@@ -9,6 +9,7 @@ import {
   Tags,
   Wallet,
   LogOut,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
@@ -20,52 +21,83 @@ const NAV = [
   { href: "/accounts", label: "Счета", icon: Wallet },
 ];
 
-export default function Sidebar() {
+interface Props {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export default function Sidebar({ mobileOpen, onMobileClose }: Props) {
   const pathname = usePathname();
   const { email, name, logout } = useAuth();
 
   return (
-    <aside className="flex h-full w-60 flex-col bg-sidebar text-white">
-      <div className="flex items-center gap-2 px-5 py-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold">
-          F
-        </div>
-        <span className="text-lg font-semibold tracking-tight">Finance</span>
-      </div>
+    <>
+      {/* Backdrop — только на мобилке когда открыт */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={onMobileClose}
+          aria-hidden
+        />
+      )}
 
-      <nav className="flex-1 space-y-1 px-3">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-sidebar-active text-white"
-                  : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
-              }`}
-            >
-              <Icon className="h-4.5 w-4.5 shrink-0" />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="border-t border-white/10 px-3 py-4">
-        <div className="mb-3 px-3">
-          <p className="truncate text-sm font-medium">{name || "User"}</p>
-          <p className="truncate text-xs text-slate-400">{email}</p>
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col bg-sidebar text-white transition-transform duration-200 md:static md:w-60 md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2 px-5 py-6">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold">
+              F
+            </div>
+            <span className="text-lg font-semibold tracking-tight">Finance</span>
+          </div>
+          <button
+            type="button"
+            onClick={onMobileClose}
+            className="rounded p-1 text-slate-300 hover:bg-sidebar-hover hover:text-white md:hidden"
+            aria-label="Закрыть меню"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-sidebar-hover hover:text-white transition-colors"
-        >
-          <LogOut className="h-4 w-4" />
-          Выйти
-        </button>
-      </div>
-    </aside>
+
+        <nav className="flex-1 space-y-1 px-3">
+          {NAV.map(({ href, label, icon: Icon }) => {
+            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onMobileClose}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-sidebar-active text-white"
+                    : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
+                }`}
+              >
+                <Icon className="h-4.5 w-4.5 shrink-0" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-white/10 px-3 py-4">
+          <div className="mb-3 px-3">
+            <p className="truncate text-sm font-medium">{name || "User"}</p>
+            <p className="truncate text-xs text-slate-400">{email}</p>
+          </div>
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-sidebar-hover hover:text-white transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Выйти
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

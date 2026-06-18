@@ -108,7 +108,10 @@ export default function CategoriesPage() {
             )}
           </div>
 
-          <form onSubmit={handleCreateCategory} className="flex items-end gap-2 border-t border-border pt-4">
+          <form
+            onSubmit={handleCreateCategory}
+            className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-end"
+          >
             <div className="flex-1">
               <label className="mb-1 block text-xs text-muted">Название</label>
               <input
@@ -119,12 +122,12 @@ export default function CategoriesPage() {
                 className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
               />
             </div>
-            <div>
+            <div className="sm:w-auto">
               <label className="mb-1 block text-xs text-muted">Родитель</label>
               <select
                 value={newCatParent}
                 onChange={(e) => setNewCatParent(e.target.value)}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+                className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none sm:w-auto"
               >
                 <option value="">Корень</option>
                 {flatCategories.filter((c) => !c.parent_id).map((c) => (
@@ -134,9 +137,10 @@ export default function CategoriesPage() {
             </div>
             <button
               type="submit"
-              className="rounded-lg bg-primary p-2 text-white hover:bg-primary-hover transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors sm:px-2"
             >
               <Plus className="h-4 w-4" />
+              <span className="sm:hidden">Добавить</span>
             </button>
           </form>
         </div>
@@ -168,9 +172,9 @@ export default function CategoriesPage() {
               return (
                 <div
                   key={rule.id}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+                  className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2"
                 >
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                     <span
                       className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
                         isExact
@@ -185,17 +189,17 @@ export default function CategoriesPage() {
                     >
                       {isExact ? "exact" : "contains"}
                     </span>
-                    <span className="font-mono text-xs bg-gray-200 rounded px-1.5 py-0.5">
+                    <span className="font-mono text-xs bg-gray-200 rounded px-1.5 py-0.5 max-w-[60vw] truncate">
                       {rule.keyword}
                     </span>
                     <span className="text-muted">→</span>
-                    <span className="font-medium">
+                    <span className="font-medium truncate">
                       {rule.category_name || `#${rule.category_id}`}
                     </span>
                   </div>
                   <button
                     onClick={() => handleDeleteRule(rule.id)}
-                    className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+                    className="shrink-0 rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -209,9 +213,9 @@ export default function CategoriesPage() {
 
           <form
             onSubmit={handleCreateRule}
-            className="space-y-2 border-t border-border pt-4"
+            className="space-y-3 border-t border-border pt-4"
           >
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <label className="mb-1 block text-xs text-muted">
                   Ключевое слово
@@ -224,12 +228,12 @@ export default function CategoriesPage() {
                   className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
-              <div>
+              <div className="sm:w-auto">
                 <label className="mb-1 block text-xs text-muted">Категория</label>
                 <select
                   value={newRuleCatId}
                   onChange={(e) => setNewRuleCatId(e.target.value)}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
+                  className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-primary focus:outline-none sm:w-auto"
                 >
                   <option value="">Выбрать</option>
                   {flatCategories.map((c) => (
@@ -242,13 +246,14 @@ export default function CategoriesPage() {
               </div>
               <button
                 type="submit"
-                className="rounded-lg bg-primary p-2 text-white hover:bg-primary-hover transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors sm:px-2"
               >
                 <Plus className="h-4 w-4" />
+                <span className="sm:hidden">Добавить правило</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-muted">Совпадение:</span>
               <div className="inline-flex overflow-hidden rounded-lg border border-border">
                 <button
@@ -300,10 +305,10 @@ function TreeNode({ node, depth, onDelete }: { node: CategoryTree; depth: number
         ) : (
           <span className="w-3.5" />
         )}
-        <span className={`flex-1 ${depth === 0 ? "font-medium" : "text-muted"}`}>{node.name}</span>
+        <span className={`flex-1 truncate ${depth === 0 ? "font-medium" : "text-muted"}`}>{node.name}</span>
         <button
           onClick={() => onDelete(node.id)}
-          className="hidden group-hover:block rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+          className="block shrink-0 rounded p-1 text-muted hover:bg-red-50 hover:text-red-500 transition-colors sm:hidden sm:group-hover:block"
           title="Удалить категорию"
         >
           <Trash2 className="h-3.5 w-3.5" />

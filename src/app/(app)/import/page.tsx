@@ -52,7 +52,7 @@ export default function ImportPage() {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-16 text-center transition-colors ${
+        className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors sm:p-16 ${
           dragging
             ? "border-primary bg-primary/5"
             : "border-border bg-surface hover:border-primary/50"
