@@ -387,9 +387,6 @@ export default function DashboardPage() {
             <Table2 className="mr-2 inline h-4 w-4" />
             Сводная таблица
           </h2>
-          <span className="text-xs text-muted">
-            Фильтры применяются ко всем блокам ниже
-          </span>
         </div>
 
         <DashboardFilters
