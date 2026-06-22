@@ -12,6 +12,7 @@ import {
   Plus,
   TrendingUp,
   TrendingDown,
+  Wallet,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Account, Category, Transaction } from "@/types";
@@ -577,6 +578,12 @@ export default function TransactionsPage() {
     total > pageIds.length;
   const showBanner = showSelectColumn && (allMatchingSelected || showExpandPrompt);
 
+  const netTotal =
+    (totals?.total_income ?? 0) - (totals?.total_expense ?? 0);
+  const netColor =
+    netTotal > 0 ? "text-income" : netTotal < 0 ? "text-expense" : "text-muted";
+  const netSign = netTotal > 0 ? "+" : netTotal < 0 ? "−" : "";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -724,6 +731,14 @@ export default function TransactionsPage() {
           <span className="text-xs text-muted">
             · {totals?.expense_count ?? 0}
           </span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Wallet className="h-3.5 w-3.5 text-primary" />
+          <span className={`font-semibold tabular-nums ${netColor}`}>
+            {netSign}
+            {fmt(Math.abs(netTotal))} ₸
+          </span>
+          <span className="text-xs text-muted">· остаток</span>
         </span>
       </div>
 

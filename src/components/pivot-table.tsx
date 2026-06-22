@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronRight, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import type {
   PivotCategoryNode,
   PivotGranularity,
@@ -32,6 +32,12 @@ function fmt(n: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+function fmtSigned(n: number) {
+  if (n === 0) return "0";
+  const abs = fmt(Math.abs(n));
+  return n > 0 ? `+${abs}` : `−${abs}`;
 }
 
 const MONTH_SHORT = [
@@ -158,6 +164,11 @@ export default function PivotTable({ data }: Props) {
             collapsed={collapsed}
             onToggle={toggle}
           />
+          <BalanceRow
+            income={data.income}
+            expense={data.expense}
+            periods={periods}
+          />
         </tbody>
       </table>
     </div>
@@ -238,6 +249,56 @@ function SideRows({
           />
         ))}
     </>
+  );
+}
+
+function BalanceRow({
+  income,
+  expense,
+  periods,
+}: {
+  income: PivotSide;
+  expense: PivotSide;
+  periods: string[];
+}) {
+  const netTotal = income.total - expense.total;
+  const bg = "bg-blue-50";
+  const colorText =
+    netTotal > 0 ? "text-income" : netTotal < 0 ? "text-expense" : "text-muted";
+
+  return (
+    <tr className={bg}>
+      <td
+        className={`sticky left-0 z-10 ${bg} py-2.5 pl-2 pr-4`}
+        style={NAME_STYLE}
+      >
+        <span className="inline-flex items-center gap-2 pl-5">
+          <Wallet className="h-4 w-4 text-primary" />
+          <span className="text-xs font-semibold uppercase tracking-wider">
+            Остаток
+          </span>
+        </span>
+      </td>
+      <td
+        className={`sticky z-10 border-r border-border ${bg} py-2.5 pl-2 pr-3 text-right font-bold tabular-nums ${colorText}`}
+        style={TOTAL_STYLE}
+      >
+        {fmtSigned(netTotal)}
+      </td>
+      {periods.map((p) => {
+        const net = (income.by_period[p] ?? 0) - (expense.by_period[p] ?? 0);
+        const cellColor =
+          net > 0 ? "text-income" : net < 0 ? "text-expense" : "text-muted";
+        return (
+          <td
+            key={p}
+            className={`py-2.5 px-2 text-right font-semibold tabular-nums ${cellColor}`}
+          >
+            {fmtSigned(net)}
+          </td>
+        );
+      })}
+    </tr>
   );
 }
 
