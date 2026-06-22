@@ -514,6 +514,25 @@ export default function TransactionsPage() {
   const descriptionActive = descriptionFilter.length > 0;
   const categoryActive = Boolean(categoryContains) || categoryUncategorized;
   const amountActive = Boolean(amountMin || amountMax);
+  const anyFilterActive =
+    dateActive ||
+    bankActive ||
+    merchantActive ||
+    descriptionActive ||
+    categoryActive ||
+    amountActive;
+
+  function resetAllFilters() {
+    setDateFrom("");
+    setDateTo("");
+    setBankFilter([]);
+    setMerchantContains("");
+    setDescriptionFilter([]);
+    setCategoryContains("");
+    setCategoryUncategorized(false);
+    setAmountMin("");
+    setAmountMax("");
+  }
 
   const showSelectColumn = mode !== "normal";
   const pageIds = transactions.map((t) => t.id);
@@ -536,7 +555,19 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Транзакции</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold">Транзакции</h1>
+          {anyFilterActive && (
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              Сбросить все фильтры
+            </button>
+          )}
+        </div>
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
