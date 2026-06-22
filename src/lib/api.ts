@@ -186,6 +186,15 @@ class ApiClient {
     );
   }
 
+  getTransactionTotals(params: Record<string, string> = {}) {
+    return this.request<{
+      total_income: number;
+      total_expense: number;
+      income_count: number;
+      expense_count: number;
+    }>(`/transactions/totals?${new URLSearchParams(params)}`);
+  }
+
   updateTransaction(
     id: number,
     data: { category_id?: number; merchant?: string; description?: string },

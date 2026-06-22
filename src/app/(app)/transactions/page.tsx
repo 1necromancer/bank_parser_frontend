@@ -10,9 +10,19 @@ import {
   Pencil,
   Check,
   Plus,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import StatsCard from "@/components/stats-card";
 import type { Account, Category, Transaction } from "@/types";
+
+interface TxTotals {
+  total_income: number;
+  total_expense: number;
+  income_count: number;
+  expense_count: number;
+}
 
 type Mode = "normal" | "edit" | "delete";
 
@@ -270,6 +280,7 @@ export default function TransactionsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [totals, setTotals] = useState<TxTotals | null>(null);
   const perPage = 30;
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -335,6 +346,21 @@ export default function TransactionsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Тоталы зависят только от фильтров (не от страницы) — отдельный эффект,
+  // чтобы не дёргать /totals при пагинации.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTransactionTotals(buildFilterParams())
+      .then((t) => {
+        if (!cancelled) setTotals(t);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [buildFilterParams]);
 
   useEffect(() => {
     api.getCategories().then(setCategories).catch(() => {});
@@ -645,6 +671,32 @@ export default function TransactionsPage() {
             </>
           )}
         </div>
+      </div>
+
+      {/* Totals — обновляются вместе с фильтрами */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatsCard
+          title="Доходы"
+          value={`${fmt(totals?.total_income ?? 0)} ₸`}
+          subtitle={
+            totals
+              ? `${totals.income_count} ${totals.income_count === 1 ? "транзакция" : "транзакций"}`
+              : undefined
+          }
+          icon={<TrendingUp className="h-5 w-5" />}
+          variant="income"
+        />
+        <StatsCard
+          title="Расходы"
+          value={`${fmt(totals?.total_expense ?? 0)} ₸`}
+          subtitle={
+            totals
+              ? `${totals.expense_count} ${totals.expense_count === 1 ? "транзакция" : "транзакций"}`
+              : undefined
+          }
+          icon={<TrendingDown className="h-5 w-5" />}
+          variant="expense"
+        />
       </div>
 
       {/* Bulk-select banner */}
