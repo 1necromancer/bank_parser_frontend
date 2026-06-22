@@ -14,7 +14,6 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import StatsCard from "@/components/stats-card";
 import type { Account, Category, Transaction } from "@/types";
 
 interface TxTotals {
@@ -673,32 +672,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Totals — обновляются вместе с фильтрами */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <StatsCard
-          title="Доходы"
-          value={`${fmt(totals?.total_income ?? 0)} ₸`}
-          subtitle={
-            totals
-              ? `${totals.income_count} ${totals.income_count === 1 ? "транзакция" : "транзакций"}`
-              : undefined
-          }
-          icon={<TrendingUp className="h-5 w-5" />}
-          variant="income"
-        />
-        <StatsCard
-          title="Расходы"
-          value={`${fmt(totals?.total_expense ?? 0)} ₸`}
-          subtitle={
-            totals
-              ? `${totals.expense_count} ${totals.expense_count === 1 ? "транзакция" : "транзакций"}`
-              : undefined
-          }
-          icon={<TrendingDown className="h-5 w-5" />}
-          variant="expense"
-        />
-      </div>
-
       {/* Bulk-select banner */}
       {showBanner && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
@@ -731,6 +704,28 @@ export default function TransactionsPage() {
           )}
         </div>
       )}
+
+      {/* Totals — компактная строка, прижата к правому краю над колонкой «Сумма» */}
+      <div className="flex flex-wrap justify-end gap-x-5 gap-y-1 text-sm">
+        <span className="inline-flex items-center gap-1.5">
+          <TrendingUp className="h-3.5 w-3.5 text-income" />
+          <span className="font-semibold text-income tabular-nums">
+            +{fmt(totals?.total_income ?? 0)} ₸
+          </span>
+          <span className="text-xs text-muted">
+            · {totals?.income_count ?? 0}
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <TrendingDown className="h-3.5 w-3.5 text-expense" />
+          <span className="font-semibold text-expense tabular-nums">
+            −{fmt(totals?.total_expense ?? 0)} ₸
+          </span>
+          <span className="text-xs text-muted">
+            · {totals?.expense_count ?? 0}
+          </span>
+        </span>
+      </div>
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl bg-surface shadow-sm border border-border/50">
