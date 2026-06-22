@@ -31,8 +31,8 @@ interface PendingEdit {
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(n);
 }
 
