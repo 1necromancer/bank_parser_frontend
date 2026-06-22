@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -97,7 +97,7 @@ function CategoryPieTooltip({
   );
 }
 
-function PivotFilters({
+function DashboardFilters({
   granularity,
   onGranularity,
   dateFrom,
@@ -265,8 +265,16 @@ export default function DashboardPage() {
   const [cashflow, setCashflow] = useState<CashflowPoint[]>([]);
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [pivot, setPivot] = useState<PivotResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [categoriesTopN, setCategoriesTopN] = useState(5);
+
+  // Глобальные фильтры дашборда — применяются ко всем виджетам ниже.
+  const [granularity, setGranularity] = useState<PivotGranularity>("month");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [accountIds, setAccountIds] = useState<number[]>([]);
 
   // Берём топ-N категорий, остальные складываем в синтетический «Прочие»
   // с прикреплённым breakdown — для подсказки при hover.
@@ -286,57 +294,43 @@ export default function DashboardPage() {
     return [...top, others];
   }, [categories, categoriesTopN]);
 
-  // Pivot-фильтры (применяются только к pivot, остальное — без изменений)
-  const [pivot, setPivot] = useState<PivotResponse | null>(null);
-  const [pivotLoading, setPivotLoading] = useState(false);
-  const [granularity, setGranularity] = useState<PivotGranularity>("month");
-  const [pivotDateFrom, setPivotDateFrom] = useState("");
-  const [pivotDateTo, setPivotDateTo] = useState("");
-  const [pivotAccountIds, setPivotAccountIds] = useState<number[]>([]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const results = await Promise.allSettled([
-      api.getSummary(),
-      api.getCategoryBreakdown(),
-      api.getCashflow("monthly"),
-      api.getRecurring(),
-      api.getAccounts(),
-    ]);
-
-    if (results[0].status === "fulfilled") setSummary(results[0].value);
-    else console.error("dashboard/summary:", results[0].reason);
-
-    if (results[1].status === "fulfilled") setCategories(results[1].value);
-    else console.error("dashboard/categories:", results[1].reason);
-
-    if (results[2].status === "fulfilled") setCashflow(results[2].value.points);
-    else console.error("dashboard/cashflow:", results[2].reason);
-
-    if (results[3].status === "fulfilled") setRecurring(results[3].value);
-    else console.error("dashboard/recurring:", results[3].reason);
-
-    if (results[4].status === "fulfilled") setAccounts(results[4].value);
-    else console.error("dashboard/accounts:", results[4].reason);
-
-    setLoading(false);
+  // Список счетов нужен один раз — для селектора фильтра.
+  useEffect(() => {
+    api
+      .getAccounts()
+      .then(setAccounts)
+      .catch((e) => console.error("dashboard/accounts:", e));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
+  // Все виджеты, зависящие от фильтров, грузим в одной волне.
   useEffect(() => {
-    setPivotLoading(true);
-    api
-      .getPivot({
-        granularity,
-        dateFrom: pivotDateFrom || undefined,
-        dateTo: pivotDateTo || undefined,
-        accountIds: pivotAccountIds.length ? pivotAccountIds : undefined,
-      })
-      .then(setPivot)
-      .catch((e) => console.error("dashboard/pivot:", e))
-      .finally(() => setPivotLoading(false));
-  }, [granularity, pivotDateFrom, pivotDateTo, pivotAccountIds]);
+    const opts = {
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      accountIds: accountIds.length ? accountIds : undefined,
+    };
+    setRefreshing(true);
+    Promise.allSettled([
+      api.getSummary(opts),
+      api.getCategoryBreakdown(opts),
+      api.getCashflow({ granularity, ...opts }),
+      api.getRecurring(opts),
+      api.getPivot({ granularity, ...opts }),
+    ]).then((r) => {
+      if (r[0].status === "fulfilled") setSummary(r[0].value);
+      else console.error("dashboard/summary:", r[0].reason);
+      if (r[1].status === "fulfilled") setCategories(r[1].value);
+      else console.error("dashboard/categories:", r[1].reason);
+      if (r[2].status === "fulfilled") setCashflow(r[2].value.points);
+      else console.error("dashboard/cashflow:", r[2].reason);
+      if (r[3].status === "fulfilled") setRecurring(r[3].value);
+      else console.error("dashboard/recurring:", r[3].reason);
+      if (r[4].status === "fulfilled") setPivot(r[4].value);
+      else console.error("dashboard/pivot:", r[4].reason);
+      setLoading(false);
+      setRefreshing(false);
+    });
+  }, [granularity, dateFrom, dateTo, accountIds]);
 
   if (loading) {
     return (
@@ -348,7 +342,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Дашборд</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Дашборд</h1>
+        {refreshing && (
+          <span className="text-xs text-muted">Обновляется...</span>
+        )}
+      </div>
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -379,6 +378,37 @@ export default function DashboardPage() {
               : undefined
           }
         />
+      </div>
+
+      {/* Pivot table — общие фильтры здесь же, влияют на все блоки ниже */}
+      <div className="rounded-xl bg-surface p-5 shadow-sm border border-border/50">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider">
+            <Table2 className="mr-2 inline h-4 w-4" />
+            Сводная таблица
+          </h2>
+          <span className="text-xs text-muted">
+            Фильтры применяются ко всем блокам ниже
+          </span>
+        </div>
+
+        <DashboardFilters
+          granularity={granularity}
+          onGranularity={setGranularity}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFrom={setDateFrom}
+          onDateTo={setDateTo}
+          accounts={accounts}
+          accountIds={accountIds}
+          onAccountIds={setAccountIds}
+        />
+
+        {pivot ? (
+          <PivotTable data={pivot} />
+        ) : (
+          <p className="py-12 text-center text-sm text-muted">Загрузка...</p>
+        )}
       </div>
 
       {/* Charts row */}
@@ -467,37 +497,6 @@ export default function DashboardPage() {
             <p className="py-20 text-center text-sm text-muted">Нет данных</p>
           )}
         </div>
-      </div>
-
-      {/* Pivot table */}
-      <div className="rounded-xl bg-surface p-5 shadow-sm border border-border/50">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider">
-            <Table2 className="mr-2 inline h-4 w-4" />
-            Сводная таблица
-          </h2>
-          {pivotLoading && (
-            <span className="text-xs text-muted">Загрузка...</span>
-          )}
-        </div>
-
-        <PivotFilters
-          granularity={granularity}
-          onGranularity={setGranularity}
-          dateFrom={pivotDateFrom}
-          dateTo={pivotDateTo}
-          onDateFrom={setPivotDateFrom}
-          onDateTo={setPivotDateTo}
-          accounts={accounts}
-          accountIds={pivotAccountIds}
-          onAccountIds={setPivotAccountIds}
-        />
-
-        {pivot ? (
-          <PivotTable data={pivot} />
-        ) : (
-          <p className="py-12 text-center text-sm text-muted">Загрузка...</p>
-        )}
       </div>
 
       {/* Recurring */}

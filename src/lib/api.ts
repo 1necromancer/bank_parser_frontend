@@ -127,34 +127,61 @@ class ApiClient {
   }
 
   // ---- Dashboard ----
-  getSummary(dateFrom?: string, dateTo?: string) {
+  getSummary(opts: {
+    dateFrom?: string;
+    dateTo?: string;
+    accountIds?: number[];
+  } = {}) {
     const p = new URLSearchParams();
-    if (dateFrom) p.set("date_from", dateFrom);
-    if (dateTo) p.set("date_to", dateTo);
+    if (opts.dateFrom) p.set("date_from", opts.dateFrom);
+    if (opts.dateTo) p.set("date_to", opts.dateTo);
+    if (opts.accountIds?.length)
+      p.set("account_id", opts.accountIds.join(","));
     return this.request<DashboardSummary>(`/dashboard/summary?${p}`);
   }
 
-  getCategoryBreakdown(dateFrom?: string, dateTo?: string) {
+  getCategoryBreakdown(opts: {
+    dateFrom?: string;
+    dateTo?: string;
+    accountIds?: number[];
+  } = {}) {
     const p = new URLSearchParams();
-    if (dateFrom) p.set("date_from", dateFrom);
-    if (dateTo) p.set("date_to", dateTo);
+    if (opts.dateFrom) p.set("date_from", opts.dateFrom);
+    if (opts.dateTo) p.set("date_to", opts.dateTo);
+    if (opts.accountIds?.length)
+      p.set("account_id", opts.accountIds.join(","));
     return this.request<CategoryBreakdown[]>(`/dashboard/categories?${p}`);
   }
 
-  getCashflow(
-    granularity = "monthly",
-    dateFrom?: string,
-    dateTo?: string,
-  ) {
-    const p = new URLSearchParams({ granularity });
-    if (dateFrom) p.set("date_from", dateFrom);
-    if (dateTo) p.set("date_to", dateTo);
+  getCashflow(opts: {
+    granularity?: "day" | "week" | "month" | "year";
+    dateFrom?: string;
+    dateTo?: string;
+    accountIds?: number[];
+  } = {}) {
+    const p = new URLSearchParams({ granularity: opts.granularity ?? "month" });
+    if (opts.dateFrom) p.set("date_from", opts.dateFrom);
+    if (opts.dateTo) p.set("date_to", opts.dateTo);
+    if (opts.accountIds?.length)
+      p.set("account_id", opts.accountIds.join(","));
     return this.request<CashflowResponse>(`/dashboard/cashflow?${p}`);
   }
 
-  getRecurring(minOccurrences = 3) {
+  getRecurring(opts: {
+    minOccurrences?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    accountIds?: number[];
+  } = {}) {
+    const p = new URLSearchParams({
+      min_occurrences: String(opts.minOccurrences ?? 3),
+    });
+    if (opts.dateFrom) p.set("date_from", opts.dateFrom);
+    if (opts.dateTo) p.set("date_to", opts.dateTo);
+    if (opts.accountIds?.length)
+      p.set("account_id", opts.accountIds.join(","));
     return this.request<RecurringTransaction[]>(
-      `/dashboard/recurring?min_occurrences=${minOccurrences}`,
+      `/dashboard/recurring?${p}`,
     );
   }
 

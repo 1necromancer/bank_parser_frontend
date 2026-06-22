@@ -49,21 +49,32 @@ const MONTH_SHORT = [
   "дек",
 ];
 
-function formatPeriodLabel(period: string, granularity: PivotGranularity): string {
-  if (granularity === "year") return period;
+// Возвращаем основной и (опционально) подзаголовок с годом — год выводим
+// отдельной мелкой строчкой, чтобы было видно на гранулярности day/week.
+function formatPeriodLabel(
+  period: string,
+  granularity: PivotGranularity,
+): { primary: string; secondary?: string } {
+  if (granularity === "year") return { primary: period };
   if (granularity === "month") {
     const [y, m] = period.split("-");
-    return `${MONTH_SHORT[parseInt(m, 10) - 1]} ${y.slice(-2)}`;
+    return {
+      primary: MONTH_SHORT[parseInt(m, 10) - 1] ?? "",
+      secondary: y,
+    };
   }
   if (granularity === "week") {
-    // "2026-W03" → "W03 26"
+    // "2026-W03" → primary "W03", secondary "2026"
     const m = period.match(/^(\d+)-W(\d+)$/);
-    if (!m) return period;
-    return `W${m[2]} ${m[1].slice(-2)}`;
+    if (!m) return { primary: period };
+    return { primary: `W${m[2]}`, secondary: m[1] };
   }
-  // day "2026-01-15" → "15 янв"
-  const [, mm, dd] = period.split("-");
-  return `${parseInt(dd, 10)} ${MONTH_SHORT[parseInt(mm, 10) - 1]}`;
+  // day "2026-01-15" → primary "15 янв", secondary "2026"
+  const [y, mm, dd] = period.split("-");
+  return {
+    primary: `${parseInt(dd, 10)} ${MONTH_SHORT[parseInt(mm, 10) - 1] ?? ""}`,
+    secondary: y,
+  };
 }
 
 interface Props {
@@ -113,15 +124,23 @@ export default function PivotTable({ data }: Props) {
             >
               Итого
             </th>
-            {periods.map((p) => (
-              <th
-                key={p}
-                className="py-2 px-2 text-right font-medium tabular-nums"
-                style={{ minWidth: `${periodWidth}px` }}
-              >
-                {formatPeriodLabel(p, granularity)}
-              </th>
-            ))}
+            {periods.map((p) => {
+              const lbl = formatPeriodLabel(p, granularity);
+              return (
+                <th
+                  key={p}
+                  className="py-2 px-2 text-right font-medium tabular-nums align-bottom"
+                  style={{ minWidth: `${periodWidth}px` }}
+                >
+                  <div className="leading-tight">{lbl.primary}</div>
+                  {lbl.secondary && (
+                    <div className="text-[10px] font-normal normal-case text-muted/70 leading-tight">
+                      {lbl.secondary}
+                    </div>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-border/40">
