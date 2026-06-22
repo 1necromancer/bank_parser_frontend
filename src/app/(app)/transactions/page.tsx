@@ -280,6 +280,7 @@ export default function TransactionsPage() {
   const [merchantContains, setMerchantContains] = useState("");
   const [descriptionFilter, setDescriptionFilter] = useState<string[]>([]);
   const [categoryContains, setCategoryContains] = useState("");
+  const [categoryUncategorized, setCategoryUncategorized] = useState(false);
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
 
@@ -295,7 +296,11 @@ export default function TransactionsPage() {
     if (bankFilter.length) p.bank = bankFilter.join(",");
     if (merchantContains) p.merchant_contains = merchantContains;
     if (descriptionFilter.length) p.description_in = descriptionFilter.join(",");
-    if (categoryContains) p.category_contains = categoryContains;
+    if (categoryUncategorized) {
+      p.uncategorized = "true";
+    } else if (categoryContains) {
+      p.category_contains = categoryContains;
+    }
     if (amountMin) p.amount_min = amountMin;
     if (amountMax) p.amount_max = amountMax;
     return p;
@@ -306,6 +311,7 @@ export default function TransactionsPage() {
     merchantContains,
     descriptionFilter,
     categoryContains,
+    categoryUncategorized,
     amountMin,
     amountMax,
   ]);
@@ -345,6 +351,7 @@ export default function TransactionsPage() {
     merchantContains,
     descriptionFilter,
     categoryContains,
+    categoryUncategorized,
     amountMin,
     amountMax,
   ]);
@@ -362,6 +369,7 @@ export default function TransactionsPage() {
     merchantContains,
     descriptionFilter,
     categoryContains,
+    categoryUncategorized,
     amountMin,
     amountMax,
   ]);
@@ -504,7 +512,7 @@ export default function TransactionsPage() {
   const bankActive = bankFilter.length > 0;
   const merchantActive = Boolean(merchantContains);
   const descriptionActive = descriptionFilter.length > 0;
-  const categoryActive = Boolean(categoryContains);
+  const categoryActive = Boolean(categoryContains) || categoryUncategorized;
   const amountActive = Boolean(amountMin || amountMax);
 
   const showSelectColumn = mode !== "normal";
@@ -782,16 +790,32 @@ export default function TransactionsPage() {
                 <HeaderDropdown label="Категория" active={categoryActive}>
                   {() => (
                     <div className="space-y-2">
+                      <label className="flex cursor-pointer items-center gap-2 rounded border border-border bg-gray-50 px-2 py-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={categoryUncategorized}
+                          onChange={(e) => {
+                            setCategoryUncategorized(e.target.checked);
+                            if (e.target.checked) setCategoryContains("");
+                          }}
+                        />
+                        <span>Без категории</span>
+                      </label>
                       <input
-                        autoFocus
                         type="text"
                         value={categoryContains}
                         onChange={(e) => setCategoryContains(e.target.value)}
                         placeholder="Содержит..."
-                        className="w-full rounded-lg border border-border px-2 py-1 text-sm focus:border-primary focus:outline-none"
+                        disabled={categoryUncategorized}
+                        className="w-full rounded-lg border border-border px-2 py-1 text-sm focus:border-primary focus:outline-none disabled:bg-gray-50 disabled:text-muted"
                       />
                       {categoryActive && (
-                        <ResetButton onClick={() => setCategoryContains("")} />
+                        <ResetButton
+                          onClick={() => {
+                            setCategoryContains("");
+                            setCategoryUncategorized(false);
+                          }}
+                        />
                       )}
                     </div>
                   )}
