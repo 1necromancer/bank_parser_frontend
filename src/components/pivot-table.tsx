@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
 import type {
   PivotCategoryNode,
@@ -8,6 +8,23 @@ import type {
   PivotResponse,
   PivotSide,
 } from "@/types";
+
+// Фиксированные ширины sticky-колонок — нужны, чтобы:
+//   1. left-смещение для sticky «Итого» совпадало с реальной шириной «Имени»;
+//   2. ширины колонок не плавали в зависимости от контента.
+const NAME_W = 220;
+const TOTAL_W = 110;
+const NAME_STYLE: CSSProperties = {
+  width: NAME_W,
+  minWidth: NAME_W,
+  maxWidth: NAME_W,
+};
+const TOTAL_STYLE: CSSProperties = {
+  width: TOTAL_W,
+  minWidth: TOTAL_W,
+  maxWidth: TOTAL_W,
+  left: NAME_W,
+};
 
 function fmt(n: number) {
   if (!n) return "—";
@@ -74,8 +91,7 @@ export default function PivotTable({ data }: Props) {
 
   const { periods, granularity } = data;
   const periodWidth = granularity === "day" ? 70 : 90;
-  // min-width: 220 (name) + N * periodWidth + 110 (total)
-  const minW = 220 + periods.length * periodWidth + 110;
+  const minW = NAME_W + TOTAL_W + periods.length * periodWidth;
 
   return (
     <div className="overflow-x-auto">
@@ -85,10 +101,16 @@ export default function PivotTable({ data }: Props) {
       >
         <thead>
           <tr className="border-b border-border text-xs uppercase text-muted">
-            <th className="sticky left-0 z-10 bg-surface py-2 pl-2 pr-4 text-left font-medium">
+            <th
+              className="sticky left-0 z-20 bg-surface py-2 pl-2 pr-4 text-left font-medium"
+              style={NAME_STYLE}
+            >
               Категория / получатель
             </th>
-            <th className="bg-surface py-2 pl-2 pr-3 text-right font-medium">
+            <th
+              className="sticky z-20 border-r border-border bg-surface py-2 pl-2 pr-3 text-right font-medium"
+              style={TOTAL_STYLE}
+            >
               Итого
             </th>
             {periods.map((p) => (
@@ -139,13 +161,18 @@ function SideRows({
   const rootKey = `side:${sideKey}`;
   const isOpen = !collapsed.has(rootKey);
   const isIncome = sideKey === "income";
-  const bg = isIncome ? "bg-green-50/70" : "bg-red-50/70";
+  // Сплошные (opaque) фоны — иначе при горизонтальном скролле сквозь
+  // sticky-ячейки просвечивают цифры из периодов.
+  const bg = isIncome ? "bg-green-50" : "bg-red-50";
   const colorText = isIncome ? "text-income" : "text-expense";
 
   return (
     <>
       <tr className={`cursor-pointer ${bg}`} onClick={() => onToggle(rootKey)}>
-        <td className={`sticky left-0 z-10 ${bg} py-2.5 pl-2 pr-4`}>
+        <td
+          className={`sticky left-0 z-10 ${bg} py-2.5 pl-2 pr-4`}
+          style={NAME_STYLE}
+        >
           <span className="inline-flex items-center gap-2">
             <ChevronRight
               className={`h-3.5 w-3.5 text-muted transition-transform ${
@@ -162,7 +189,10 @@ function SideRows({
             </span>
           </span>
         </td>
-        <td className={`${bg} py-2.5 pl-2 pr-3 text-right font-bold tabular-nums ${colorText}`}>
+        <td
+          className={`sticky z-10 border-r border-border ${bg} py-2.5 pl-2 pr-3 text-right font-bold tabular-nums ${colorText}`}
+          style={TOTAL_STYLE}
+        >
           {isIncome ? "+" : "−"}
           {fmt(side.total)}
         </td>
@@ -221,7 +251,10 @@ function CategoryRows({
         className={`${hasChildren ? "cursor-pointer" : ""} hover:bg-gray-50/60`}
         onClick={() => hasChildren && onToggle(path)}
       >
-        <td className="sticky left-0 z-10 bg-surface py-2 pl-2 pr-4">
+        <td
+          className="sticky left-0 z-10 bg-surface py-2 pl-2 pr-4"
+          style={NAME_STYLE}
+        >
           <span
             className="inline-flex items-center gap-1.5"
             style={{ paddingLeft: pad }}
@@ -241,7 +274,8 @@ function CategoryRows({
           </span>
         </td>
         <td
-          className={`bg-surface py-2 pl-2 pr-3 text-right font-semibold tabular-nums ${colorText}`}
+          className={`sticky z-10 border-r border-border bg-surface py-2 pl-2 pr-3 text-right font-semibold tabular-nums ${colorText}`}
+          style={TOTAL_STYLE}
         >
           {fmt(node.total)}
         </td>
@@ -272,7 +306,10 @@ function CategoryRows({
       {isOpen &&
         node.items.map((item, i) => (
           <tr key={`${path}/i/${i}`} className="hover:bg-gray-50/60">
-            <td className="sticky left-0 z-10 bg-surface py-1.5 pl-2 pr-4">
+            <td
+              className="sticky left-0 z-10 bg-surface py-1.5 pl-2 pr-4"
+              style={NAME_STYLE}
+            >
               <span
                 className="inline-flex items-center gap-1.5 text-muted"
                 style={{ paddingLeft: pad + 18 }}
@@ -282,7 +319,8 @@ function CategoryRows({
               </span>
             </td>
             <td
-              className={`bg-surface py-1.5 pl-2 pr-3 text-right font-medium tabular-nums opacity-80 ${colorText}`}
+              className={`sticky z-10 border-r border-border bg-surface py-1.5 pl-2 pr-3 text-right font-medium tabular-nums opacity-80 ${colorText}`}
+              style={TOTAL_STYLE}
             >
               {fmt(item.total)}
             </td>
